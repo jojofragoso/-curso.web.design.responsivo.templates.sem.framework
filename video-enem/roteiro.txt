@@ -1,0 +1,9 @@
+Ficar dez minutos tentando resolver aquela questão difícil vai literalmente afundar a sua nota, mesmo se você acertar.
+
+Existe um algoritmo por trás da prova chamado TRI, e ele funciona como um detector de mentiras.
+
+Pense no ENEM como uma torre de blocos: fáceis embaixo, médias no meio e difíceis no topo. Se você acerta a questão impossível da última página, mas errou a conta básica de porcentagem... o sistema não acha que você é um gênio. Ele assume que você chutou. E o valor daquela questão difícil despenca quase a zero.
+
+Já quem pula a pedreira e garante primeiro todas as fáceis e médias constrói uma base sólida. O algoritmo entende que o conhecimento é real e paga a pontuação máxima por cada acerto.
+
+No ENEM, teimosia custa a sua vaga. Pule a difícil sem dó, garanta a base e só volte nela se sobrar tempo.
