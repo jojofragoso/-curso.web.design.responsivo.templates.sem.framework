@@ -12,8 +12,8 @@ export const CLAUDIO_COLORS = {
   jeans: 0x6b8fb8, shoe: 0x1a1a1d, sole: 0x55565e, cheek: 0xf09a9a,
 };
 
-export function buildClaudio({ shirt } = {}) {
-  const C = { ...CLAUDIO_COLORS }; if (shirt) C.shirt = shirt;
+export function buildClaudio({ shirt, skin, hair, jeans, beard = true } = {}) {
+  const C = { ...CLAUDIO_COLORS }; if (shirt) C.shirt = shirt; if (skin) C.skin = skin; if (hair) { C.hair = hair; C.beard = hair; } if (jeans) C.jeans = jeans;
   const mSkin = M(C.skin), mHair = M(C.hair), mFade = M(C.fade), mBeard = M(C.beard), mShirt = M(C.shirt),
     mJeans = M(C.jeans), mShoe = M(C.shoe), mSole = M(C.sole), mCheek = M(C.cheek), mBlack = M(0x111111);
 
@@ -66,10 +66,12 @@ export function buildClaudio({ shirt } = {}) {
   const q2 = box(.55, .26, .45, mHair, .25, .9, .38); q2.rotation.z = -.12; H.add(q2);
   H.add(box(1.22, .26, .2, mHair, 0, .56, .5));
   // barba
+  const beardStart = H.children.length;
   H.add(box(1.18, .28, .62, mBeard, 0, -.5, .26));
   for (const sx of [-1, 1]) H.add(box(.08, .5, .42, mBeard, sx * .57, -.24, .24));
   H.add(box(.62, .1, .06, mBeard, 0, -.24, .56)); // bigode
   H.add(box(.3, .26, .06, mBeard, 0, -.52, .57)); // cavanhaque
+  if (!beard) H.children.slice(beardStart).forEach(m => m.visible = false);
   const mouth = box(.32, .05, .03, M(0x6b2f25), 0, -.33, .575); H.add(mouth);
   // nariz
   H.add(box(.16, .3, .14, M(0xe3ad8a), 0, -.02, .6));
@@ -92,7 +94,7 @@ export function buildClaudio({ shirt } = {}) {
     mouth.scale.set(1, 1, 1);
   }
   const api = {
-    root, head, torso, body, legs, arms, eyes, brows, mouth, reset,
+    root, head, torso, H, body, legs, arms, eyes, brows, mouth, reset,
     // expressões
     blink(v) { eyes.forEach(e => e.scale.y = Math.max(.12, 1 - v)); },
     sad() { brows.forEach((b, i) => { b.rotation.z = (i ? 1 : -1) * .25; }); mouth.scale.x = .7; },
