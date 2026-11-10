@@ -58,6 +58,7 @@ subprocess.run(['node', 'render.js', 'video', *args], cwd='cenas', check=True)
 # 2) normaliza cada trecho (720x1280, 30 fps); cenas de IA mais curtas que o trecho
 #    ficam em câmera lenta (até 1.5x) e seguram o último quadro
 parts = []
+slows = {}
 for k, (src, _i, _o, ss, end) in enumerate(SEQ):
     dur = durs[k]
     out = f'tmp_{k:02d}.mp4'
@@ -66,6 +67,7 @@ for k, (src, _i, _o, ss, end) in enumerate(SEQ):
                                                '-of', 'csv=p=0', src]).decode())
         avail = (end if end else full) - ss
         slow = min(1.5, max(1.0, dur / avail))
+        slows[k] = slow
         inp = ['-ss', str(ss), '-t', str(avail), '-i', src]
         vf = f"setpts=PTS*{slow:.3f},"
     else:
@@ -129,13 +131,51 @@ Style: Leg,Poppins ExtraBold,64,&H00FFFFFF,&H00FFFFFF,&H00141414,&H64000000,0,0,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """ + "\n".join(lines) + "\n")
 
-# 4) X vermelho, legendas e narração
+# 4) efeitos sonoros, no tempo de cada animação
+import sfx
+
+def clip_t(name, frame, fps=24):
+    k = idx[name]
+    return starts[k] + (frame / fps - SEQ[k][3]) * slows.get(k, 1.0)
+
+A = lambda name, t: starts[idx[name]] + t
+E_ = EVENTS
+ev = []
+for k in range(1, len(SEQ)):
+    ev.append((starts[k] - 0.15, 'whoosh', 0.35))
+ev += [
+    (A('insta', E_['insta']['like'] - 0.05), 'tap', 0.8), (A('insta', E_['insta']['like']), 'like', 0.8),
+    (A('insta', E_['insta']['zin'] - 0.1), 'whoosh', 0.5), (A('insta', E_['insta']['zout'] - 0.1), 'whoosh', 0.4),
+    (A('insta', E_['insta']['unlike'] - 0.05), 'tap', 0.8), (A('insta', E_['insta']['unlike']), 'unlike', 0.8),
+    (A('panic', 0.0), 'stinger', 0.9),
+    (A('chat1', 0.2), 'msg_in', 0.35), (A('chat1', 0.35), 'msg_out', 0.3),
+    (A('chat1', E_['chat1']['m1']), 'msg_out', 0.7), (A('chat1', E_['chat1']['m2']), 'msg_in', 0.7),
+    (A('chat1', E_['chat1']['m2'] + 0.6), 'msg_in', 0.6),
+    (A('chat2', 0.4), 'msg_in', 0.5), (A('chat2', E_['chat2']['m1']), 'msg_in', 0.9),
+    (A('S5.mp4', 0.5), 'sparkle', 0.7),
+    (A('gallery', 0.0), 'ticks', 0.8), (A('gallery', 0.7), 'pop', 0.7),
+    (A('formatura', 0.0), 'tada', 0.8),
+    (A('send', E_['send']['m1'] - 0.05), 'tap', 0.8), (A('send', E_['send']['m1']), 'msg_out', 0.8),
+    (A('ship', 0.3), 'horn', 0.45), (A('ship', E_['ship']['b1']), 'msg_in', 0.8),
+    (A('ship', E_['ship']['b2']), 'msg_out', 0.8),
+    (A('S8.mp4', 2.6), 'gulp', 0.8),
+    (A('final', 0.2), 'pop', 0.6), (A('final', 0.4), 'pop', 0.5), (A('final', 0.6), 'pop', 0.7),
+    (st(167), 'pop', 0.5), (st(169), 'pop', 0.5), (st(170), 'bell', 0.7),
+]
+ev += [(clip_t('S6.mp4', f), 'shutter', 0.8) for f in (16, 52, 73)]
+ev += [(clip_t('S7.mp4', 41), 'shutter', 0.8)]
+ev += [(a, 'wrong', 0.6) for a, _b in X_MARKS]
+sfx.build(ev, TOTAL, 'sfx.wav')
+
+# 5) X vermelho, legendas, narração + efeitos
 xf = "".join(f"[v{n}][1:v]overlay=0:0:enable='between(t,{a:.2f},{b:.2f})'[v{n+1}];"
              for n, (a, b) in enumerate(X_MARKS))
 fc = (f"[0:v]null[v0];{xf}[v{len(X_MARKS)}]ass=legendas.ass:fontsdir=cenas[vout];"
-      f"[2:a]apad,atrim=0:{TOTAL},afade=t=out:st={TOTAL - 0.5}:d=0.5[aout]")
+      f"[2:a]volume=1.4,apad,atrim=0:{TOTAL}[nar];[3:a]volume=0.32[fx];"
+      f"[nar][fx]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,"
+      f"afade=t=out:st={TOTAL - 0.5}:d=0.5[aout]")
 subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', 'tmp_video.mp4', '-loop', '1', '-i', 'cenas/x.png',
-                '-i', 'narracao.mp3', '-filter_complex', fc, '-map', '[vout]', '-map', '[aout]',
+                '-i', 'narracao.mp3', '-i', 'sfx.wav', '-filter_complex', fc, '-map', '[vout]', '-map', '[aout]',
                 '-t', str(TOTAL), '-c:v', 'libx264', '-crf', '18', '-preset', 'slow', '-pix_fmt', 'yuv420p',
                 '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', 'claudio-final.mp4'], check=True)
 for p in parts + ['tmp_video.mp4', 'lista.txt']:
