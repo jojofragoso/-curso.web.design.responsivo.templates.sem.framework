@@ -14,7 +14,7 @@ html,body{width:720px;height:1280px;overflow:hidden;background:#17213a;font-fami
 .notch{position:absolute;left:50%;top:10px;width:120px;height:30px;margin-left:-60px;background:#0d0d12;border-radius:20px;z-index:5}
 .sbar{height:52px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 34px 4px;font-weight:700;font-size:17px;color:#111}
 .ighead{display:flex;align-items:center;gap:12px;padding:14px 18px;font-weight:700;font-size:19px;color:#111}
-.av{width:42px;height:42px;border-radius:50%;background:#d9926a;border:2px solid #e1306c;flex:none}
+.av{width:42px;height:42px;border-radius:50%;background:#d9926a url(bia.jpg) center/cover;border:2px solid #e1306c;flex:none}
 .post{width:100%;height:476px;position:relative;overflow:hidden}
 .icons{display:flex;gap:20px;padding:14px 18px 6px;align-items:center}
 .likes{padding:2px 18px;font-weight:700;font-size:18px;color:#111}
@@ -58,20 +58,20 @@ const beach=`<svg width="476" height="476" viewBox="0 0 476 476">
 const scenes={
 // 7.7s: like, zoom on date, unlike
 insta(t){
-  const liked = t>0.75 && t<7.05;
-  const z = t<2.4?1: 1+0.75*ease((t-2.4)/0.6) - (t>5.6? 0.75*ease((t-5.6)/0.6):0);
-  const oy = t<2.4?0: -330*ease((t-2.4)/0.6) + (t>5.6? 330*ease((t-5.6)/0.6):0);
-  const hl = t>3.0 && t<5.6;
+  const E=window.E||{like:.75,zin:2.4,zout:5.6,unlike:6.9};const liked = t>E.like && t<E.unlike+0.15;
+  const z = t<E.zin?1: 1+0.75*ease((t-E.zin)/0.6) - (t>E.zout? 0.75*ease((t-E.zout)/0.6):0);
+  const oy = t<E.zin?0: -330*ease((t-E.zin)/0.6) + (t>E.zout? 330*ease((t-E.zout)/0.6):0);
+  const hl = t>E.zin+0.6 && t<E.zout;
   // finger: tap at 0.7 and 6.9
   let fy=1400, fx=126;
   const tap=(c)=>{const d=t-c; if(d<-0.6||d>0.5) return null; return d<0? 1400-(1400-842)*ease((d+0.6)/0.55) : 842+40*Math.sin(cl(d/0.12)*Math.PI)+ (d>0.2? (d-0.2)/0.3*560:0)};
-  const a=tap(0.7), b=tap(6.9); if(a!==null) fy=a; if(b!==null) fy=b;
-  const hs = liked? 1+0.35*Math.sin(cl((t-0.75)/0.3)*Math.PI):1;
+  const a=tap(E.like-0.05), b=tap(E.unlike-0.05); if(a!==null) fy=a; if(b!==null) fy=b;
+  const hs = liked? 1+0.35*Math.sin(cl((t-E.like)/0.3)*Math.PI):1;
   return bg()+`<div class="phone" style="transform-origin:12% 80%;transform:translate(${-oy*0.35}px,${oy*0.6}px) scale(${z})"><div class="notch"></div>
   <div class="sbar"><span>3:12</span><span>▮▮ ◔</span></div>
   <div style="text-align:center;font-weight:800;font-size:19px;padding:4px 0 2px">Publicações</div>
   <div class="ighead"><div class="av"></div><div>bia.moura<div style="font-size:13px;font-weight:600;color:#666">Arraial do Cabo, RJ</div></div></div>
-  <div class="post">${beach}</div>
+  <div class="post"><img src="bia.jpg" style="width:100%;height:100%;object-fit:cover"></div>
   <div class="icons"><span style="display:inline-block;transform:scale(${hs})">${heart(liked)}</span>${bubble}${plane}</div>
   <div class="likes">${liked?88:87} curtidas</div>
   <div class="cap">bia.moura <span>fase franja, nunca mais 🙈</span></div>
@@ -88,26 +88,26 @@ chat(t, msgs, time, extra=''){
   <div class="chathead"><span style="font-size:28px">‹</span><div class="av"></div><div>bia.moura<small>online</small></div></div>
   <div class="msgs">${h}</div><div class="input">Mensagem...<div class="send"></div></div></div>${extra}`;
 },
-chat1(t){return scenes.chat(t,[
+chat1(t){const E=window.E||{m1:3.3,m2:4.5};return scenes.chat(t,[
   {ts:'Última conversa: 2016',at:0.1},
   {x:'parabéns pela formatura!! 🎓',at:0.2},
   {x:'valeu! boa sorte aí',o:1,at:0.35},
-  {ts:'Hoje 3:13',at:3.2},
-  {x:'mals, curti sem querer 😅',o:1,at:3.3},
-  {x:'kkkkkk relaxa',at:4.5},
-  {x:'cláudio?? da escola??',at:4.9}],'3:14');},
-chat2(t){return scenes.chat(t,[
+  {ts:'Hoje 3:13',at:E.m1-0.1},
+  {x:'mals, curti sem querer 😅',o:1,at:E.m1},
+  {x:'kkkkkk relaxa',at:E.m2},
+  {x:'cláudio?? da escola??',at:E.m2+0.6}],'3:14');},
+chat2(t){const E=window.E||{m1:1.3};return scenes.chat(t,[
   {x:'lembra da prova de física? kkk',at:0},
   {x:'até hoje tenho trauma',o:1,at:0},
   {x:'kkkkkkkkk',at:0},
   {ts:'6:41',at:0},
   {x:'seu perfil não tem nenhuma foto sua',at:0.4},
-  {x:'me manda uma? 👀',at:1.3}],'6:41');},
-send(t){return scenes.chat(t,[
+  {x:'me manda uma? 👀',at:E.m1}],'6:41');},
+send(t){const E=window.E||{m1:1.9};return scenes.chat(t,[
   {x:'seu perfil não tem nenhuma foto sua',at:0},
   {x:'me manda uma? 👀',at:0},
-  {x:`<div class="q" style="width:170px;height:170px;font-size:110px;border-color:#3797f0">?</div>`,o:1,at:1.9}],'7:03',
-  t>1.6&&t<2.2?`<div class="finger" style="left:520px;top:${1400-(1400-1080)*ease((t-1.6)/0.3)}px"></div>`:'');},
+  {x:`<div class="q" style="width:170px;height:170px;font-size:110px;border-color:#3797f0">?</div>`,o:1,at:E.m1}],'7:03',
+  t>E.m1-0.3&&t<E.m1+0.3?`<div class="finger" style="left:520px;top:${1400-(1400-1080)*ease((t-E.m1+0.3)/0.3)}px"></div>`:'');},
 // gallery 1.3s then formatura 4.6s
 gallery(t){
   let cells=''; for(let i=0;i<15;i++){const isQ=i==7; const c=['#2d3240','#5b4636','#7d8794','#3e4a5c','#8a6b52'][i%5];
@@ -141,7 +141,7 @@ ship(t){
    <div style="position:absolute;left:0;top:165px;width:560px;height:120px;background:#24407a;border:5px solid #1b1b1b;clip-path:polygon(0 0,100% 0,92% 100%,6% 100%);color:#fff;font-weight:900;font-size:24px;text-align:right;padding:40px 70px 0 0">MAR ALTO</div>
   </div>
   <div style="position:absolute;left:0;right:0;top:820px;bottom:0;background:#2a8fb8;transform:translateY(${6*Math.sin(t*3)}px)"><svg width="800" height="520" style="position:absolute;left:0;top:0">${waves}</svg></div>
-  ${bub(2.75,'⚓ desembarco em Santos dia 30.<br><span style="color:#e1306c">sai comigo?</span>')}${bub(3.85,'SIM!!! 😁',1)}`;
+  ${bub((window.E||{b1:2.75}).b1,'⚓ desembarco em Santos dia 30.<br><span style="color:#e1306c">sai comigo?</span>')}${bub((window.E||{b2:3.85}).b2,'SIM!!! 😁',1)}`;
 },
 final(t){
   const face=(x,flip)=>`<div style="position:absolute;left:${x}px;top:560px;width:270px;height:270px;border-radius:50%;overflow:hidden;border:7px solid #fff;background:#fff;transform:scale(${pop((t-0.2)/0.4)}) ${flip?'scaleX(-1)':''}"><img src="claudio-rosto.jpg" style="position:absolute;left:-210px;top:-10px;height:300px"></div>`;
