@@ -1,0 +1,69 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 720
+PlayResY: 1280
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Leg,Poppins ExtraBold,64,&H00FFFFFF,&H00FFFFFF,&H00141414,&H64000000,0,0,0,0,100,100,0,0,1,6,3,2,30,30,250,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.08,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}TRÊS DA MANHÃ.
+Dialogue: 0,0:00:01.08,0:00:01.54,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}O {\c&HFFC16E&}CLÁUDIO{\c&HFFFFFF&}
+Dialogue: 0,0:00:01.54,0:00:02.73,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ACABOU DE {\c&H4A2BED&}CURTIR{\c&HFFFFFF&}
+Dialogue: 0,0:00:02.73,0:00:03.56,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}SEM QUERER,
+Dialogue: 0,0:00:03.56,0:00:04.70,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}UMA FOTO DA {\c&H4A2BED&}BIA{\c&HFFFFFF&}
+Dialogue: 0,0:00:04.70,0:00:06.58,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}DE {\c&H3FD2FF&}2019{\c&HFFFFFF&}
+Dialogue: 0,0:00:06.58,0:00:07.58,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}SETE ANOS PRA TRÁS
+Dialogue: 0,0:00:07.58,0:00:08.54,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}NO PERFIL DELA.
+Dialogue: 0,0:00:08.54,0:00:09.78,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELE {\c&H4A2BED&}DESCURTE.{\c&HFFFFFF&}
+Dialogue: 0,0:00:09.78,0:00:10.90,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}TARDE {\c&H4A2BED&}DEMAIS.{\c&HFFFFFF&}
+Dialogue: 0,0:00:10.90,0:00:11.87,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}OS DOIS ESTUDARAM
+Dialogue: 0,0:00:11.87,0:00:12.28,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}JUNTOS,
+Dialogue: 0,0:00:12.28,0:00:13.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}MAS NÃO SE FALAVAM
+Dialogue: 0,0:00:13.20,0:00:14.18,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}DESDE A ESCOLA.
+Dialogue: 0,0:00:14.18,0:00:15.38,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELE PEDE DESCULPA,
+Dialogue: 0,0:00:15.38,0:00:16.08,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELA RI...
+Dialogue: 0,0:00:16.08,0:00:16.88,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E A CONVERSA VAI
+Dialogue: 0,0:00:16.88,0:00:18.02,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ATÉ O {\c&H3FD2FF&}SOL NASCER.{\c&HFFFFFF&}
+Dialogue: 0,0:00:18.02,0:00:19.32,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}AÍ CHEGA A MENSAGEM:
+Dialogue: 0,0:00:19.32,0:00:19.74,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}“ME MANDA
+Dialogue: 0,0:00:19.74,0:00:20.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}UMA FOTO SUA?”
+Dialogue: 0,0:00:20.80,0:00:21.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ESSE É O {\c&HFFC16E&}CLÁUDIO.{\c&HFFFFFF&}
+Dialogue: 0,0:00:21.80,0:00:22.95,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}CHINELO CONSERTADO
+Dialogue: 0,0:00:22.95,0:00:23.73,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}COM ARAME,
+Dialogue: 0,0:00:23.73,0:00:24.87,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}CALÇA FURADA,
+Dialogue: 0,0:00:24.87,0:00:25.32,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}UM DENTE
+Dialogue: 0,0:00:25.32,0:00:26.11,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}QUE FOI EMBORA
+Dialogue: 0,0:00:26.11,0:00:28.07,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}EM {\c&H3FD2FF&}2021{\c&HFFFFFF&}
+Dialogue: 0,0:00:28.07,0:00:28.87,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}SEM AVISAR.
+Dialogue: 0,0:00:28.87,0:00:29.62,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E O BONÉ...
+Dialogue: 0,0:00:29.62,0:00:30.89,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELE {\c&H4A2BED&}NUNCA{\c&HFFFFFF&} TIRA.
+Dialogue: 0,0:00:30.89,0:00:32.14,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}PRIMEIRA TENTATIVA...
+Dialogue: 0,0:00:32.14,0:00:32.86,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}SEGUNDA...
+Dialogue: 0,0:00:32.86,0:00:33.66,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}TERCEIRA,
+Dialogue: 0,0:00:33.66,0:00:34.24,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}COM A AJUDA
+Dialogue: 0,0:00:34.24,0:00:35.25,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}DA DONA {\c&HFFC16E&}NEIDE{\c&HFFFFFF&}...
+Dialogue: 0,0:00:35.25,0:00:35.79,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H4A2BED&}NADA.{\c&HFFFFFF&}
+Dialogue: 0,0:00:35.79,0:00:36.85,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ATÉ QUE ELE ACHA:
+Dialogue: 0,0:00:36.85,0:00:38.17,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}FORMATURA DO IRMÃO,
+Dialogue: 0,0:00:38.17,0:00:39.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}TERNO ALUGADO,
+Dialogue: 0,0:00:39.20,0:00:39.79,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}UMA TARDE
+Dialogue: 0,0:00:39.79,0:00:41.62,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}DE {\c&H3FD2FF&}2018.{\c&HFFFFFF&}
+Dialogue: 0,0:00:41.62,0:00:42.45,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A {\c&H3FD2FF&}ÚNICA{\c&HFFFFFF&} FOTO
+Dialogue: 0,0:00:42.45,0:00:43.53,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}BOA DA VIDA DELE.
+Dialogue: 0,0:00:43.53,0:00:44.36,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELE MANDA.
+Dialogue: 0,0:00:44.36,0:00:45.53,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELA TRABALHA NUM NAVIO
+Dialogue: 0,0:00:45.53,0:00:47.14,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E VOLTA EM {\c&H3FD2FF&}30 DIAS.{\c&HFFFFFF&}
+Dialogue: 0,0:00:47.14,0:00:48.19,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELA CHAMA PRA SAIR.
+Dialogue: 0,0:00:48.19,0:00:49.46,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ELE DIZ {\c&H3FD2FF&}SIM.{\c&HFFFFFF&}
+Dialogue: 0,0:00:49.46,0:00:50.26,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}SÓ QUE ELA MARCOU
+Dialogue: 0,0:00:50.26,0:00:51.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}COM O CARA DA FOTO...
+Dialogue: 0,0:00:51.40,0:00:52.62,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E QUEM VAI APARECER
+Dialogue: 0,0:00:52.62,0:00:53.49,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}É {\c&H4A2BED&}ESSE AQUI.{\c&HFFFFFF&}
+Dialogue: 0,0:00:53.49,0:00:54.61,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H3FD2FF&}30 DIAS.{\c&HFFFFFF&}
+Dialogue: 0,0:00:54.61,0:00:55.76,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}POR ONDE ELE COMEÇA?
+Dialogue: 0,0:00:55.76,0:00:57.05,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H3FD2FF&}BARBA{\c&HFFFFFF&} OU {\c&H4A2BED&}DENTE?{\c&HFFFFFF&}
+Dialogue: 0,0:00:57.05,0:00:58.74,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}COMENTA UMA PALAVRA.
