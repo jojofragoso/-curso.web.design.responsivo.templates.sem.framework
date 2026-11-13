@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head><body>
+<canvas id="c" width="576" height="1024"></canvas>
+<script>
+const W = 576, H = 1024, PY = 220, PH = 600; // painel da cena
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const INK = '#111', PELE = '#fdfdfd', SOMBRA = '#d9d9d9';
+
+// ---------- utilidades ----------
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = k => k * k * (3 - 2 * k);
+const backOut = k => { const s = 2.2; k -= 1; return k * k * ((s + 1) * k + s) + 1; };
+const rnd = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+const noise = (t, seed) => Math.sin(t * 31 + seed * 7) * 0.5 + Math.sin(t * 57 + seed * 3) * 0.5;
+
+function ell(x, y, rx, ry, fill, stroke = true, lw = 5) {
+  ctx.beginPath(); ctx.ellipse(x, y, Math.max(rx, .1), Math.max(ry, .1), 0, 0, Math.PI * 2);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke(); }
+}
+function line(pts, lw = 5, col = INK) {
+  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.lineWidth = lw; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+}
+function texto(str, x, y, size, fill = '#fff', rot = 0, sc = 1, stroke = INK) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc);
+  ctx.font = `900 ${size}px "DejaVu Sans", Arial, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = size / 6; ctx.strokeStyle = stroke; ctx.lineJoin = 'round';
+  ctx.strokeText(str, 0, 0); ctx.fillStyle = fill; ctx.fillText(str, 0, 0);
+  ctx.restore();
+}
+
+// ---------- cenário ----------
+function fundo(t, triste = 0, raios = 0) {
+  const g = ctx.createLinearGradient(0, PY, 0, PY + PH);
+  g.addColorStop(0, triste ? '#6f8fa8' : '#5ea8e8');
+  g.addColorStop(1, triste ? '#b7c6d1' : '#cfe8fb');
+  ctx.fillStyle = g; ctx.fillRect(0, PY, W, PH);
+  // nuvens
+  for (let i = 0; i < 4; i++) {
+    const x = ((i * 190 + t * 12) % 760) - 100, y = PY + 60 + i * 55;
+    ctx.fillStyle = triste ? '#9fb0bd' : '#fff';
+    [[0, 0, 40], [35, -12, 32], [70, 0, 38], [35, 10, 34]].forEach(([dx, dy, r]) => {
+      ctx.beginPath(); ctx.arc(x + dx, y + dy, r * .8, 0, 7); ctx.fill();
+    });
+  }
+  // mata
+  ctx.fillStyle = triste ? '#3d5240' : '#3f7a3a';
+  ctx.beginPath(); ctx.moveTo(0, PY + PH);
+  for (let x = 0; x <= W; x += 24) ctx.lineTo(x, PY + 400 + Math.sin(x * .05) * 22 + Math.sin(x * .13) * 12);
+  ctx.lineTo(W, PY + PH); ctx.fill();
+  ctx.fillStyle = triste ? '#56634f' : '#7fae54';
+  ctx.fillRect(0, PY + 470, W, PH - 470);
+  if (raios) { // linhas de impacto estilo mangá
+    ctx.save(); ctx.globalAlpha = raios;
+    const cx = W / 2, cy = PY + PH / 2;
+    for (let i = 0; i < 48; i++) {
+      const a = i / 48 * Math.PI * 2 + rnd(i) * .1, r0 = 170 + rnd(i + 5) * 80 + Math.sin(t * 20 + i) * 15;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a - .03) * 700, cy + Math.sin(a - .03) * 700);
+      ctx.lineTo(cx + Math.cos(a + .03) * 700, cy + Math.sin(a + .03) * 700);
+      ctx.fillStyle = '#fff'; ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ---------- CAPITÃO ----------
+function capitao(p, t) {
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0); ctx.scale(p.s, p.s * (p.sy || 1));
+  // tronco
+  ctx.beginPath(); ctx.moveTo(-160, 150); ctx.quadraticCurveTo(0, 105, 160, 150);
+  ctx.lineTo(185, 420); ctx.lineTo(-185, 420); ctx.closePath();
+  ctx.fillStyle = '#1b1b1b'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  // pescoço
+  ctx.fillStyle = PELE; ctx.fillRect(-38, 80, 76, 75); line([-38, 80, -38, 140]); line([38, 80, 38, 140]);
+  ctx.save(); ctx.scale(1, 1 + (p.inflate || 0) * .15);
+  // orelhas
+  ell(-98, 5, 22, 34, PELE); ell(98, 5, 22, 34, PELE);
+  // cabeça (mandíbula larga)
+  ctx.beginPath();
+  ctx.moveTo(-95, -30);
+  ctx.bezierCurveTo(-100, -150, 100, -150, 95, -30);
+  ctx.bezierCurveTo(100, 60, 70, 130, 0, 135 + (p.mouth || 0) * 35);
+  ctx.bezierCurveTo(-70, 130, -100, 60, -95, -30);
+  ctx.fillStyle = (p.red ? `rgb(255,${255 - p.red * 110},${255 - p.red * 110})` : PELE);
+  ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  // cabelo espetado
+  ctx.beginPath(); ctx.moveTo(-98, -20); ctx.quadraticCurveTo(-112, -135, 0, -142);
+  ctx.quadraticCurveTo(112, -135, 98, -20);
+  ctx.lineTo(85, -65); ctx.lineTo(55, -82); ctx.lineTo(25, -66); ctx.lineTo(-8, -90);
+  ctx.lineTo(-40, -68); ctx.lineTo(-72, -80); ctx.lineTo(-88, -45); ctx.closePath();
+  ctx.fillStyle = '#2a2a2a'; ctx.fill(); ctx.stroke();
+  line([-20, -138, -5, -160, 5, -140], 5); // topete
+
+  const ex = p.eyes || 'angry';
+  if (ex === 'angry') {
+    const es = p.eyeSize || 1;
+    for (const sx of [-1, 1]) {
+      ell(sx * 40, -18, 25 * es, 21 * es, '#fff');
+      ell(sx * 40 + noise(t, sx) * 3, -18 + noise(t, sx + 3) * 3, 4.5, 4.5, INK, false);
+      // veias nos olhos
+      if (es > 1.2) for (let k = 0; k < 3; k++)
+        line([sx * (40 + 22 * es) , -18 + (k - 1) * 8, sx * (40 + 12 * es), -18 + (k - 1) * 5], 2, '#d22');
+    }
+    ctx.lineWidth = 12;
+    line([-78, -62 - es * 6, -14, -38], 12); line([78, -62 - es * 6, 14, -38], 12);
+    // rugas na testa
+    line([-35, -78, 35, -78], 3); line([-25, -90, 25, -90], 3);
+  } else if (ex === 'smug') {
+    const tw = p.twitch || 0;
+    // olho esquerdo meio fechado
+    ell(-40, -15, 25, 15, '#fff'); ell(-30, -12, 5, 5, INK, false);
+    ctx.fillStyle = SOMBRA; ctx.beginPath(); ctx.ellipse(-40, -15, 25, 15, 0, Math.PI, 0); ctx.fill();
+    line([-66, -16, -14, -16], 6);
+    line([-78, -42, -12, -36], 10);
+    // olho direito arregalado e tremendo
+    ctx.save(); ctx.translate(40 + tw * 3, -22); ctx.scale(1 + tw * .25, 1 + tw * .25);
+    ell(0, 0, 27, 27, '#fff'); ell(-6, 4, 6, 6, INK, false); ctx.restore();
+    line([12, -70 - (p.browUp || 0) * 40, 50, -84 - (p.browUp || 0) * 50, 82, -64 - (p.browUp || 0) * 30], 10);
+    // rugas de deboche
+    line([-72, 10, -60, 30], 3); line([72, 10, 60, 30], 3);
+  } else if (ex === 'laugh') {
+    for (const sx of [-1, 1]) line([sx * 62, -24, sx * 40, -10, sx * 18, -24], 7);
+    line([-75, -55, -15, -45], 9); line([75, -55, 15, -45], 9);
+    // lágrimas de rir
+    for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) {
+      const k = ((t * 2.2 + i / 6) % 1);
+      const x = sx * (65 + k * 120), y = -15 - Math.sin(k * Math.PI) * 60 + k * 120;
+      ell(x, y, 7, 10, '#7fd3ff', true, 2);
+    }
+  }
+  // nariz + narinas
+  const fl = p.flare || 0;
+  line([0, -10, -12, 30, 6, 34], 4);
+  ell(-14, 36, 4 + fl * 9, 3 + fl * 6, INK, false); ell(14, 36, 4 + fl * 9, 3 + fl * 6, INK, false);
+  if (fl > .3) { // fumaça do nariz
+    for (let i = 0; i < 4; i++) {
+      const k = (t * 2 + i / 4) % 1;
+      ctx.globalAlpha = 1 - k; ell(-30 - k * 60, 45 + k * 30, 8 + k * 18, 6 + k * 12, '#eee', false);
+      ell(30 + k * 60, 45 + k * 30, 8 + k * 18, 6 + k * 12, '#eee', false); ctx.globalAlpha = 1;
+    }
+  }
+  // boca
+  const m = p.mouth || 0;
+  if (p.mouthType === 'grin') {
+    const g = p.grin || 1;
+    ctx.beginPath(); ctx.moveTo(-58 * g, 60); ctx.quadraticCurveTo(0, 105 + g * 10, 58 * g, 60);
+    ctx.quadraticCurveTo(0, 72, -58 * g, 60); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 5; ctx.stroke();
+    for (let i = -4; i <= 4; i++) line([i * 12 * g, 66, i * 12 * g, 84 + (4 - Math.abs(i)) * 3], 2.5);
+    line([-58 * g, 60, -68 * g, 50], 4); line([58 * g, 60, 68 * g, 50], 4);
+  } else if (p.mouthType === 'laugh') {
+    ctx.beginPath(); ctx.moveTo(-62, 50); ctx.lineTo(62, 50); ctx.quadraticCurveTo(0, 175, -62, 50);
+    ctx.fillStyle = '#3a0a0a'; ctx.fill(); ctx.lineWidth = 5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-52, 52, 104, 16); line([-52, 68, 52, 68], 3);
+    ell(0, 110, 26, 14, '#e2475d', false);
+  } else if (m > 0.02) {
+    const rx = 30 + m * 52, ry = 6 + m * 72, cy = 62 + m * 22;
+    ell(0, cy, rx, ry, '#3a0a0a', true, 6);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(0, cy, rx, ry, 0, 0, 7); ctx.clip();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-rx, cy - ry, rx * 2, ry * .32);
+    for (let i = -5; i <= 5; i++) line([i * rx / 5.5, cy - ry, i * rx / 5.5, cy - ry * .68], 2.5);
+    ctx.fillRect(-rx, cy + ry * .78, rx * 2, ry * .3);
+    ell(0, cy + ry * .55, rx * .55, ry * .35, '#e2475d', false);
+    // úvula balançando
+    ell(noise(t, 9) * 5, cy - ry * .55, 6, 10 + m * 6, '#c9354b', false);
+    ctx.restore(); ell(0, cy, rx, ry, null, true, 6);
+  } else {
+    line([-40, 72, -10, 66, 10, 66, 40, 72], 7); // boca cerrada
+  }
+  // veia de raiva pulsando
+  if (p.vein) {
+    const pv = 1 + Math.abs(Math.sin(t * 14)) * .35 * p.vein;
+    ctx.save(); ctx.translate(55, -100); ctx.scale(pv, pv);
+    ctx.strokeStyle = '#d0021b'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      ctx.save(); ctx.rotate(i * Math.PI / 2);
+      ctx.beginPath(); ctx.moveTo(5, -18); ctx.quadraticCurveTo(5, -5, 18, -5); ctx.stroke(); ctx.restore();
+    }
+    ctx.restore();
+  }
+  // gotas de suor de esforço
+  if (p.sweat) for (let i = 0; i < 3; i++) {
+    const k = (t * 1.5 + i / 3) % 1;
+    ell(-85 + i * 75, -60 + k * 90, 6, 9, '#8fd8ff', true, 2);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+// ---------- RECRUTA 02 ----------
+function recruta(p, t) {
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
+  ctx.scale(p.s * (p.sx || 1), p.s * (p.sy || 1));
+  // tronco
+  ctx.beginPath(); ctx.moveTo(-130, 160); ctx.quadraticCurveTo(0, 125, 130, 160);
+  ctx.lineTo(150, 420); ctx.lineTo(-150, 420); ctx.closePath();
+  ctx.fillStyle = '#1b1b1b'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  ctx.fillStyle = PELE; ctx.fillRect(-26, 100, 52, 62); line([-26, 100, -26, 150]); line([26, 100, 26, 150]);
+  const ch = p.chin || 0; // tremedeira do queixo
+  // orelhonas (abanando)
+  for (const sx of [-1, 1]) {
+    ctx.save(); ctx.translate(sx * 78, -5);
+    ctx.rotate(sx * ((p.flap || 0) * (0.5 + Math.sin(t * 38 + sx) * .4)));
+    ell(sx * 34, 0, 40, 60, PELE); line([sx * 22, -25, sx * 42, -5, sx * 26, 25], 3);
+    ctx.restore();
+  }
+  // cabeça comprida
+  ctx.beginPath(); ctx.moveTo(-78, -40);
+  ctx.bezierCurveTo(-85, -170, 85, -170, 78, -40);
+  ctx.bezierCurveTo(80, 70, 50, 140 + ch, 0, 148 + ch);
+  ctx.bezierCurveTo(-50, 140 + ch, -80, 70, -78, -40);
+  ctx.fillStyle = PELE; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  // barba por fazer
+  ctx.fillStyle = '#bbb';
+  for (let i = 0; i < 40; i++) { const a = rnd(i) * Math.PI, r = 55 + rnd(i + 9) * 15;
+    ctx.fillRect(Math.cos(a) * r - 1, 70 + Math.sin(a) * r * .9 + ch * .5 - 20, 2.5, 2.5); }
+  // rugas de sofrimento
+  line([-60, 20, -50, 45], 3); line([60, 20, 50, 45], 3);
+
+  const md = p.mode || 'scared';
+  if (md === 'scared') {
+    for (const sx of [-1, 1]) {
+      ell(sx * 34, -30, 28, 34, '#fff');
+      ell(sx * 34 + noise(t * 2, sx) * 6, -24 + noise(t * 2, sx + 4) * 6, 5, 5, INK, false);
+    }
+    line([-66, -72, -12, -88], 7); line([66, -72, 12, -88], 7); // sobrancelhas preocupadas
+    // boca tremida + dentes batendo
+    const gap = 4 + Math.abs(Math.sin(t * 45)) * 10;
+    ctx.fillStyle = '#fff'; ctx.fillRect(-40, 62, 80, 14); ctx.fillRect(-40, 76 + gap, 80, 14);
+    ctx.lineWidth = 4; ctx.strokeRect(-40, 62, 80, 14); ctx.strokeRect(-40, 76 + gap, 80, 14);
+    for (let i = -3; i <= 3; i++) { line([i * 11, 62, i * 11, 76], 2); line([i * 11, 76 + gap, i * 11, 90 + gap], 2); }
+  } else if (md === 'cry') {
+    for (const sx of [-1, 1]) line([sx * 58, -40, sx * 18, -25, sx * 58, -14], 7); // > <
+    line([-66, -60, -16, -82], 8); line([66, -60, 16, -82], 8);
+    // chafariz de lágrimas
+    for (const sx of [-1, 1]) for (let i = 0; i < 14; i++) {
+      const k = (t * 1.8 + i / 14) % 1;
+      const x = sx * (45 + k * 230), y = -28 - Math.sin(k * Math.PI) * 120 + k * k * 260;
+      ell(x, y, 9 - k * 3, 13 - k * 4, '#5cc8ff', true, 2.5);
+    }
+    // bocão chorando (lábio de baixo tremendo)
+    const w = Math.sin(t * 30) * 4;
+    ctx.beginPath(); ctx.moveTo(-50, 95 + w); ctx.quadraticCurveTo(0, 30, 50, 95 - w);
+    ctx.quadraticCurveTo(0, 125 + ch, -50, 95 + w);
+    ctx.fillStyle = '#3a0a0a'; ctx.fill(); ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-28, 63, 56, 9);
+    ell(0, 105 + ch * .5, 22, 9, '#e2475d', false);
+  } else if (md === 'faint') {
+    for (const sx of [-1, 1]) { // olhos em espiral
+      ell(sx * 34, -30, 28, 30, '#fff');
+      ctx.beginPath();
+      for (let a = 0; a < 16; a += .2) {
+        const r = a * 1.6, aa = a + t * 14 * sx;
+        const x = sx * 34 + Math.cos(aa) * r, y = -30 + Math.sin(aa) * r;
+        a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    }
+    // boca aberta com língua de fora
+    ell(0, 85, 34, 30, '#3a0a0a', true, 5);
+    ctx.save(); ctx.translate(10, 95); ctx.rotate(.25 + Math.sin(t * 8) * .15);
+    ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-14, 55); ctx.quadraticCurveTo(0, 75, 14, 55); ctx.lineTo(14, 0);
+    ctx.fillStyle = '#ff6b81'; ctx.fill(); ctx.lineWidth = 4; ctx.stroke(); line([0, 10, 0, 50], 2.5);
+    ctx.restore();
+  }
+  // nariz + bolha de meleca
+  line([0, -20, -14, 35, 8, 40], 4);
+  if (p.snot > 0) {
+    const r = p.snot * 46;
+    ctx.save(); ctx.globalAlpha = .55; ell(-6 - r * .7, 42 + r * .3, r, r * .92, '#bff0c4', false); ctx.restore();
+    ell(-6 - r * .7, 42 + r * .3, r, r * .92, null, true, 3);
+    ell(-6 - r * 1.05, 42 - r * .1, r * .18, r * .12, '#fff', false);
+  }
+  // suor
+  if (p.sweat) for (let i = 0; i < 4; i++) {
+    const k = (t * 2.2 + i / 4) % 1;
+    ell(-70 + i * 46, -95 + k * 120, 7, 10, '#8fd8ff', true, 2);
+  }
+  // boné 02 (pode voar)
+  const co = p.capOff || 0;
+  if (co < 1) {
+    ctx.save(); ctx.translate(-co * 260, -co * 340); ctx.rotate(-co * 6);
+    ctx.beginPath(); ctx.moveTo(-86, -70);
+    ctx.bezierCurveTo(-92, -190, 92, -190, 86, -70); ctx.closePath();
+    ctx.fillStyle = '#1c1c1c'; ctx.fill(); ctx.lineWidth = 5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-86, -70); ctx.lineTo(-150, -58); ctx.lineTo(-140, -80); ctx.lineTo(-84, -86); ctx.closePath();
+    ctx.fillStyle = '#111'; ctx.fill(); ctx.stroke();
+    texto('02', 5, -122, 40, '#fff', -.05, 1, '#1c1c1c');
+    ctx.restore();
+  } else {
+    // careca com 3 fios em pé
+    for (let i = -1; i <= 1; i++) {
+      const sw = Math.sin(t * 20 + i) * 6;
+      ctx.beginPath(); ctx.moveTo(i * 18, -150); ctx.bezierCurveTo(i * 18 + sw, -185, i * 25 - sw, -195, i * 22 + sw, -220);
+      ctx.lineWidth = 3.5; ctx.strokeStyle = INK; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// ---------- efeitos ----------
+function cuspe(x, y, t, t0, dir = -1) {
+  for (let i = 0; i < 40; i++) {
+    const born = t0 + rnd(i) * 2.2; const age = t - born;
+    if (age < 0 || age > .7) continue;
+    const a = Math.PI + (rnd(i + 3) - .5) * 1.4;
+    const v = 420 + rnd(i + 7) * 500;
+    const px = x + Math.cos(a) * v * age * -dir * -1, py = y + Math.sin(a) * v * age + 300 * age * age;
+    ell(px, py, 5 + rnd(i) * 6, 4 + rnd(i) * 5, '#c9f1ff', true, 2);
+  }
+}
+function vento(t, x0, x1, y0, y1) {
+  ctx.save(); ctx.globalAlpha = .9;
+  for (let i = 0; i < 14; i++) {
+    const y = y0 + rnd(i) * (y1 - y0), k = (t * 3 + rnd(i + 2)) % 1;
+    const x = lerp(x1, x0, k);
+    line([x, y, x - 90, y], 4, '#fff');
+  }
+  ctx.restore();
+}
+function estrelas(cx, cy, t, r = 90) {
+  for (let i = 0; i < 4; i++) {
+    const a = t * 5 + i * Math.PI / 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * .35;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(t * 6);
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) { const rr = k % 2 ? 9 : 22, aa = k * Math.PI / 5;
+      ctx.lineTo(Math.cos(aa) * rr, Math.sin(aa) * rr); }
+    ctx.closePath(); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ---------- legenda ----------
+function legenda(str, t, t0, cor = '#fff', size = 48) {
+  const k = backOut(prog(t, t0, t0 + .25));
+  const lines = str.split('\n');
+  lines.forEach((l, i) => texto(l, W / 2, 900 + i * (size + 8) - (lines.length - 1) * (size + 8) / 2, size, cor, 0, k));
+}
+
+// ---------- quadro ----------
+window.draw = function (t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  texto('RECRUTA 02', W / 2, 95, 56, '#fff');
+  texto('o pior dia da vida dele', W / 2, 158, 30, '#ffd23f');
+
+  ctx.save(); ctx.beginPath(); ctx.rect(0, PY, W, PH); ctx.clip();
+  let shake = 0;
+
+  if (t < 3.5) { // CENA 1: o grito
+    const grito = t >= 1;
+    shake = grito ? 9 : 0;
+    ctx.translate(noise(t, 1) * shake, noise(t, 2) * shake);
+    fundo(t, 0, grito ? .35 : 0);
+    const inspira = ease(prog(t, 0, 1));
+    const avancar = ease(prog(t, 1, 1.25));
+    recruta({ x: 150 + (grito ? noise(t * 2, 5) * 6 : noise(t, 5) * 2), y: 610, s: .85,
+      sx: grito ? 1.12 : 1, sy: grito ? .93 : 1, rot: grito ? -.12 : 0,
+      mode: 'scared', capOff: ease(prog(t, 1.1, 1.8)), flap: grito ? 1 : 0, sweat: 1 }, t);
+    if (grito) vento(t, 0, 330, PY + 120, PY + 420);
+    capitao({ x: lerp(440, 395, avancar), y: 590, s: lerp(.95, 1.18, inspira) + (grito ? noise(t, 8) * .02 : 0),
+      rot: lerp(0, -.18, avancar), inflate: inspira * (grito ? .3 : 1),
+      eyes: 'angry', eyeSize: grito ? 1.65 : 1, mouth: grito ? .95 + noise(t, 3) * .07 : 0,
+      vein: grito ? 1 : inspira * .5, red: grito ? .9 : inspira * .4, flare: grito ? .2 : inspira, sweat: grito }, t);
+    if (grito) cuspe(310, 520, t, 1.0);
+  } else if (t < 6.5) { // CENA 2: o choro
+    const lt = t - 3.5;
+    ctx.translate(noise(t, 1) * 2, 0);
+    fundo(t, 1);
+    // chuvinha triste
+    for (let i = 0; i < 30; i++) { const y = PY + ((t * 500 + rnd(i) * PH) % PH);
+      line([rnd(i + 1) * W, y, rnd(i + 1) * W - 6, y + 22], 2, 'rgba(255,255,255,.6)'); }
+    const snot = t < 6 ? ease(prog(t, 3.8, 6)) : 0;
+    recruta({ x: 288 + Math.sin(t * 40) * 3, y: 600, s: 1.3 + lt * .05, sy: 1 + Math.sin(t * 9) * .02,
+      mode: 'cry', capOff: 1, flap: .25, chin: Math.sin(t * 50) * 6, snot }, t);
+    if (t >= 6 && t < 6.45) { // POP!
+      const k = prog(t, 6, 6.45);
+      for (let i = 0; i < 12; i++) { const a = i / 12 * 7, r = 40 + k * 120;
+        ell(200 + Math.cos(a) * r, 640 + Math.sin(a) * r, 8 * (1 - k) + 1, 8 * (1 - k) + 1, '#bff0c4', true, 2); }
+      texto('POP!', 160, 560, 70, '#bff0c4', -.2, backOut(clamp(k * 3)));
+    }
+  } else if (t < 9.5) { // CENA 3: o deboche
+    const lt = t - 6.5;
+    fundo(t, 0, .25 + lt * .12);
+    const tw = (t > 7.6 && t < 8) || (t > 8.6 && t < 9.1) ? Math.abs(Math.sin(t * 60)) : 0;
+    capitao({ x: 288, y: 500 + lt * 12, s: 1.3 + ease(prog(t, 6.5, 9.5)) * .45, rot: Math.sin(t * 2) * .05,
+      eyes: 'smug', browUp: ease(prog(t, 6.7, 7.4)), twitch: tw, mouthType: 'grin',
+      grin: 1 + ease(prog(t, 8, 9.2)) * .55, flare: ease(prog(t, 8.3, 9)) }, t);
+  } else if (t < 12) { // CENA 4: desmaio
+    const lt = t - 9.5;
+    const cai = ease(prog(t, 10, 10.75));
+    const impacto = t > 10.75 && t < 11.1;
+    shake = impacto ? 14 * (1 - prog(t, 10.75, 11.1)) : 0;
+    ctx.translate(noise(t, 1) * shake, noise(t, 2) * shake);
+    fundo(t);
+    // pivô nos pés
+    const PX = 470, PYG = PY + 545, S4 = .8, ang = lerp(0, -1.45, cai);
+    ctx.save(); ctx.translate(PX, PYG); ctx.rotate(ang);
+    const quique = t > 10.75 ? Math.abs(Math.sin((t - 10.75) * 14)) * 30 * Math.exp(-(t - 10.75) * 5) : 0;
+    ctx.translate(0, -quique);
+    recruta({ x: 0, y: -420 * S4 + Math.sin(t * 6) * (1 - cai) * 6, s: S4,
+      rot: Math.sin(t * 7) * .12 * (1 - cai), mode: 'faint', capOff: 1, flap: 0 }, t);
+    ctx.restore();
+    // estrelas em volta da cabeça
+    const d = 420 * S4 + 90;
+    estrelas(PX + Math.sin(ang) * d, PYG - Math.cos(ang) * d - 40, t, 75);
+    if (t > 10.75) texto('BOING!', 160, 380, 72, '#ffd23f', -.15 + Math.sin(t * 20) * .05, backOut(clamp((t - 10.75) * 4)));
+  } else if (t < 14.3) { // CENA 5: gargalhada
+    const lt = t - 12;
+    fundo(t, 0, .4);
+    capitao({ x: 288 + Math.sin(t * 13) * 10, y: 620 + Math.abs(Math.sin(t * 13)) * -30, s: 1.55,
+      rot: Math.sin(t * 6.5) * .12, sy: 1 + Math.sin(t * 26) * .04,
+      eyes: 'laugh', mouthType: 'laugh', red: .35 }, t);
+    for (let i = 0; i < 10; i++) {
+      const born = 12 + i * .22, age = t - born; if (age < 0) continue;
+      const k = age / 1.6; if (k > 1) continue;
+      texto('HA', 60 + rnd(i) * 460, 760 - k * 420, 40 + rnd(i + 2) * 30, '#fff', (rnd(i + 4) - .5) * .8, backOut(clamp(k * 5)));
+    }
+  } else { // final
+    ctx.fillStyle = '#000'; ctx.fillRect(0, PY, W, PH);
+    const k = backOut(prog(t, 14.3, 14.7));
+    texto('FIM', W / 2, PY + 260, 110, '#fff', 0, k);
+    texto('(ele pediu pra sair)', W / 2, PY + 360, 34, '#ffd23f', 0, backOut(prog(t, 14.6, 15)));
+  }
+  ctx.restore();
+
+  // legendas
+  if (t < 1) legenda('*respira fundo*', t, 0.05, '#ddd', 38);
+  else if (t < 3.5) legenda('PEDE PRA SAIR!!!', t, 1.0, '#ff4d4d', 48);
+  else if (t < 6.5) legenda('N-n-não, senhor...\n*soluço*', t, 3.6, '#fff', 44);
+  else if (t < 8) legenda('Tá chorando, zero dois?', t, 6.6, '#fff', 40);
+  else if (t < 9.5) legenda('Quer um lencinho?', t, 8.0, '#ffd23f', 46);
+  else if (t < 10.75) legenda('...', t, 9.6, '#fff', 60);
+  else if (t < 12) legenda('*desmaiou*', t, 10.8, '#bbb', 44);
+  else if (t < 14.3) legenda('HAHAHAHAHAHA', t, 12.05, '#fff', 52);
+};
+draw(0);
+</script>
+</body></html>
