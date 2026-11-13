@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script src="env.js"></script>
+</head><body>
+<canvas id="c" width="576" height="1024"></canvas>
+<script>
+const W = 576, H = 1024, FPS = 24;
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const INK = '#141414';
+const PELE_R = '#7b4a2c', PELE_R2 = '#5e3720';   // rapaz
+const PELE_S = '#a0613a', PELE_S2 = '#7f4627';   // senhor
+
+// ---------- utilidades ----------
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = k => k * k * (3 - 2 * k);
+const backOut = k => { const s = 2.4; k -= 1; return k * k * ((s + 1) * k + s) + 1; };
+const rnd = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
+const noise = (t, s) => Math.sin(t * 31 + s * 7) * .5 + Math.sin(t * 57 + s * 3) * .5;
+const env = t => { const i = Math.floor(t * FPS); const a = (window.ENV || [])[i] || 0, b = (window.ENV || [])[i + 1] || 0; return clamp(lerp(a, b, t * FPS - i) * 1.25); };
+
+function ell(x, y, rx, ry, fill, lw = 5, rot = 0) {
+  ctx.beginPath(); ctx.ellipse(x, y, Math.max(rx, .1), Math.max(ry, .1), rot, 0, Math.PI * 2);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke(); }
+}
+function line(pts, lw = 5, col = INK) {
+  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.lineWidth = lw; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+}
+function tube(pts, w, col) { line(pts, w + 9, INK); line(pts, w, col); }
+function poly(pts, fill, lw = 5) {
+  ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.stroke(); }
+}
+function rrect(x, y, w, h, r, fill, lw = 5) {
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke(); }
+}
+function texto(str, x, y, size, fill = '#fff', rot = 0, sc = 1, stroke = INK) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc);
+  ctx.font = `900 ${size}px "DejaVu Sans", Arial, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = size / 5; ctx.strokeStyle = stroke; ctx.lineJoin = 'round';
+  ctx.strokeText(str, 0, 0); ctx.fillStyle = fill; ctx.fillText(str, 0, 0);
+  ctx.restore();
+}
+function estrela(x, y, r, rot, fill = '#fff') {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.beginPath();
+  for (let k = 0; k < 8; k++) { const rr = k % 2 ? r * .25 : r, a = k * Math.PI / 4; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+}
+// IK de 2 ossos: devolve o cotovelo
+function ik(sx, sy, tx, ty, L1, L2, bend) {
+  let dx = tx - sx, dy = ty - sy, d = Math.hypot(dx, dy);
+  d = Math.min(d, L1 + L2 - .01);
+  const a = Math.atan2(dy, dx);
+  const cosA = clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1);
+  const ang = a + bend * Math.acos(cosA);
+  return [sx + Math.cos(ang) * L1, sy + Math.sin(ang) * L1];
+}
+function braco(sx, sy, tx, ty, o) {
+  const [ex, ey] = ik(sx, sy, tx, ty, o.L1 || 70, o.L2 || 68, o.bend || 1);
+  const d = Math.hypot(tx - sx, ty - sy), lim = (o.L1 || 70) + (o.L2 || 68);
+  if (d > lim) { const k = lim / d; tx = sx + (tx - sx) * k; ty = sy + (ty - sy) * k; }
+  tube([sx, sy, ex, ey, tx, ty], o.w || 26, o.pele);
+  // manga
+  const mx = lerp(sx, ex, .55), my = lerp(sy, ey, .55);
+  tube([sx, sy, mx, my], (o.w || 26) + 14, o.manga);
+  if (o.friso) line([mx - (ey - sy) * .2, my + (ex - sx) * .2, mx + (ey - sy) * .2, my - (ex - sx) * .2], 6, o.friso);
+  if (o.tattoo) { // tatuagens no antebraço
+    for (let i = 1; i < 5; i++) { const k = i / 5; const x = lerp(ex, tx, k), y = lerp(ey, ty, k);
+      ell(x + noise(i, 2) * 3, y, 5, 3, null, 0); line([x - 6, y - 3, x + 2, y + 4, x + 7, y - 2], 2.5, '#2b170c'); }
+  }
+  if (o.relogio) { const x = lerp(ex, tx, .85), y = lerp(ey, ty, .85); ell(x, y, 11, 11, '#e9b53b', 4); }
+  ell(tx, ty, 17, 15, o.pele, 4.5);
+  return [tx, ty];
+}
+
+// ---------- cenário ----------
+function cenario(t) {
+  const g = ctx.createLinearGradient(0, -200, 0, 650);
+  g.addColorStop(0, '#2f7fd6'); g.addColorStop(1, '#bfe0fb');
+  ctx.fillStyle = g; ctx.fillRect(-400, -400, 1400, 1100);
+  for (let i = 0; i < 5; i++) { // nuvens
+    const x = ((i * 230 + t * 10) % 1100) - 300, y = 60 + (i % 3) * 70;
+    ctx.fillStyle = '#fff';
+    [[0, 0, 50], [45, -20, 42], [90, 0, 48], [45, 12, 40]].forEach(([dx, dy, r]) => { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, 7); ctx.fill(); });
+  }
+  // fios de poste
+  ctx.save(); ctx.globalAlpha = .7;
+  line([-200, 120, 900, 40], 2.5); line([-200, 160, 900, 70], 2.5); ctx.restore();
+  // galpão da loja
+  rrect(140, 210, 700, 250, 6, '#2a2c33', 5);
+  for (let x = 160; x < 840; x += 28) line([x, 215, x, 455], 2, '#3a3d46');
+  rrect(300, 245, 260, 70, 10, '#1c1d22', 3);
+  ctx.save(); ctx.fillStyle = '#ff4b2e'; ctx.font = '900 italic 40px "DejaVu Sans", sans-serif';
+  ctx.textAlign = 'left'; ctx.fillText('AUTO CENTER', 318, 293); ctx.restore();
+  rrect(-300, 330, 520, 140, 30, '#3a3a3a', 0); // toldo escuro à esquerda
+  // chão
+  ctx.fillStyle = '#9a958c'; ctx.fillRect(-400, 640, 1400, 800);
+  ctx.fillStyle = '#86817a'; for (let i = 0; i < 30; i++) ctx.fillRect(rnd(i) * 900 - 200, 680 + rnd(i + 3) * 400, 30, 4);
+}
+function caminhonete(portaAberta = 1) {
+  // corpo
+  rrect(-80, 300, 560, 560, 40, '#f4f5f6');
+  rrect(300, 330, 160, 150, 18, '#283240'); // vidro traseiro
+  line([310, 345, 360, 465], 5, 'rgba(255,255,255,.35)');
+  // abertura do motorista (interior)
+  rrect(-40, 320, 300, 500, 24, '#22252b');
+  // banco
+  rrect(10, 380, 120, 300, 30, '#33363d', 4);
+  rrect(30, 620, 200, 70, 20, '#33363d', 4);
+  // volante
+  ell(-10, 470, 25, 70, null, 9);
+  // soleira
+  rrect(-60, 800, 380, 40, 8, '#d9dbde');
+  // porta aberta (em perspectiva)
+  poly([262, 310, 340, 280, 340, 880, 262, 830], '#f4f5f6');
+  poly([272, 330, 332, 306, 332, 470, 272, 480], '#283240', 3);
+  rrect(285, 540, 34, 10, 5, '#bbb', 3);
+  // rodas
+  ell(410, 860, 70, 70, '#1b1b1b'); ell(410, 860, 34, 34, '#bfc3c8');
+}
+
+// ---------- RAPAZ (óculos grandões, sorrisão, tattoo, corrente) ----------
+function cabecaRapaz(p, t) {
+  const m = p.mouth || 0, ex = p.expr || 'normal', gd = p.glassDrop || 0;
+  ctx.save(); ctx.translate(p.hx || 0, 0); ctx.rotate(p.htilt || 0);
+  ell(-60, 8, 13, 19, PELE_R); ell(60, 8, 13, 19, PELE_R);
+  ctx.beginPath(); ctx.ellipse(0, 0, 60, 72, 0, 0, 7);
+  ctx.fillStyle = p.red ? `rgb(${123 + p.red * 120},${74 - p.red * 30},${44 - p.red * 20})` : PELE_R;
+  ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  // cabelo: topo reto com degradê
+  poly([-58, -18, -60, -64, -44, -92, 44, -92, 60, -64, 58, -18, 46, -48, -46, -48], '#2e2219', 4);
+  poly([-50, -50, -44, -96, 44, -96, 50, -50], '#121212', 4);
+  ctx.fillStyle = '#262626'; for (let i = 0; i < 18; i++) { ctx.beginPath(); ctx.arc(-38 + (i % 9) * 9.5, -86 + Math.floor(i / 9) * 12, 3.5, 0, 7); ctx.fill(); }
+  // sobrancelhas
+  const bu = p.browUp || 0;
+  line([-46, -44 - bu * 16, -12, -50 - bu * 22], 8); line([46, -44 - bu * 16, 12, -50 - bu * 22], 8);
+  // olhos
+  const gy = -18 + gd * 26;
+  for (const sx of [-1, 1]) {
+    const x = sx * 28;
+    if (ex === 'pop') continue;
+    if (ex === 'squint') { line([x - 12, -16, x, -22, x + 12, -16], 5); continue; }
+    const big = ex === 'shock' ? 1.6 : 1;
+    ell(x, -18, 12 * big, 10 * big, '#fff', 3);
+    if (ex === 'dollar') { texto('$', x, -16, 30, '#3ddc5a', 0, 1 + Math.sin(t * 12) * .12); }
+    else ell(x + (p.look || 0) * 4, -17, 4.5 * big, 4.5 * big, INK, 0);
+  }
+  // óculos grandões (traço forte!)
+  for (const sx of [-1, 1]) {
+    ctx.save(); ctx.globalAlpha = .18; rrect(sx * 30 - 27, gy - 21, 54, 42, 13, '#bfe3ff', 0); ctx.restore();
+    rrect(sx * 30 - 27, gy - 21, 54, 42, 13, null, 9);
+    line([sx * 30 - 16, gy - 10, sx * 30 - 4, gy - 16], 4, 'rgba(255,255,255,.85)');
+  }
+  line([-3, gy - 6, 3, gy - 6], 8); line([-57, gy - 10, -62, gy - 4], 7); line([57, gy - 10, 62, gy - 4], 7);
+  if (ex === 'pop') { // olhos saltando dos óculos com mola
+    const k = p.pop || 1;
+    for (const sx of [-1, 1]) {
+      const x = sx * (30 + 20 * k), y = -18 - 40 * k;
+      ctx.beginPath(); for (let i = 0; i <= 12; i++) { const q = i / 12; ctx.lineTo(lerp(sx * 30, x, q) + (i % 2 ? 6 : -6), lerp(gy, y, q)); }
+      ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
+      ell(x, y, 24, 24, '#fff', 4); ell(x, y, 8, 8, INK, 0);
+      for (let v = 0; v < 3; v++) line([x + 22 * Math.cos(v * 2), y + 22 * Math.sin(v * 2), x + 13 * Math.cos(v * 2 + .2), y + 13 * Math.sin(v * 2 + .2)], 2, '#e22');
+    }
+  }
+  if (p.glint) estrela(-44, gy - 18, 26 * p.glint, t * 4);
+  // nariz
+  ctx.beginPath(); ctx.moveTo(-4, 0); ctx.quadraticCurveTo(-22, 22, -6, 28); ctx.moveTo(4, 0); ctx.quadraticCurveTo(22, 22, 6, 28);
+  ctx.lineWidth = 3.5; ctx.strokeStyle = PELE_R2; ctx.stroke();
+  ell(-9, 25, 4, 3, PELE_R2, 0); ell(9, 25, 4, 3, PELE_R2, 0);
+  // boca: sorrisão sempre presente
+  const w = 34 + (p.smile || 0) * 6;
+  ctx.beginPath(); ctx.moveTo(-w, 36); ctx.quadraticCurveTo(0, 40, w, 36);
+  ctx.quadraticCurveTo(0, 46 + 8 + m * 62, -w, 36); ctx.closePath();
+  ctx.fillStyle = '#3a0c0c'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#fff'; ctx.fillRect(-w, 33, w * 2, 12);
+  for (let i = -3; i <= 3; i++) line([i * 9, 36, i * 9, 45], 1.5, '#888');
+  if (m > .25) ell(0, 46 + m * 55, 20, 10, '#e2475d', 0);
+  ctx.restore();
+  line([-w - 4, 30, -w + 2, 38], 3); line([w + 4, 30, w - 2, 38], 3); // covinhas
+  if (p.fogo) { // fogo saindo da boca
+    for (let i = 0; i < 7; i++) {
+      const k = (t * 3 + i / 7) % 1;
+      ctx.save(); ctx.globalAlpha = 1 - k;
+      ell(noise(i, t) * 10, 70 + k * 120, 18 + k * 26, 22 + k * 28, k < .4 ? '#ffd23f' : '#ff6a2b', 0);
+      ctx.restore();
+    }
+  }
+  if (p.vapor) for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const k = (t * 2.5 + i / 4) % 1;
+    ctx.save(); ctx.globalAlpha = (1 - k) * .9;
+    ell(sx * (70 + k * 60), 0 - k * 70, 12 + k * 20, 10 + k * 16, '#f2f2f2', 0); ctx.restore();
+  }
+  if (p.suor) for (let i = 0; i < 3; i++) { const k = (t * 1.8 + i / 3) % 1; ell(-50 + i * 50, -60 + k * 70, 6, 9, '#8fd8ff', 2); }
+  ctx.restore();
+}
+function troncoRapaz(p, t) {
+  // tronco: polo azul-marinho
+  poly([-62, -160, 62, -160, 70, -40, 56, 10, -56, 10, -70, -40], '#1f2a44');
+  poly([-22, -164, 0, -128, 22, -164], '#18213a', 4); // gola
+  line([0, -128, 0, -96], 4, '#0f1526');
+  ctx.fillStyle = PELE_R; ctx.fillRect(-20, -192, 40, 34); line([-20, -192, -20, -162], 4); line([20, -192, 20, -162], 4);
+  // corrente com pingente
+  ctx.beginPath(); ctx.moveTo(-24, -160); ctx.quadraticCurveTo(0, -100, 24, -160); ctx.lineWidth = 3; ctx.strokeStyle = '#d6d6d6'; ctx.stroke();
+  ell(0, -118, 10, 10, '#222', 3); ell(0, -118, 5, 5, '#ddd', 0);
+}
+function rapazSentado(p, t) {
+  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(p.s, p.s);
+  // pernas (perna de trás)
+  tube([0, 0, 112, 18], 52, '#e9e9e9'); tube([112, 18, 128, 190], 30, PELE_R2);
+  rrect(110, 120, 40, 74, 8, '#fff', 4); ell(150, 200, 40, 18, '#fff', 4);
+  // perna da frente
+  tube([10, 10, 135, 30], 56, '#f4f4f4');
+  tube([135, 30, 150, 205], 32, PELE_R);
+  for (let i = 0; i < 4; i++) line([137 + i * 3, 55 + i * 22, 148 + i * 3, 64 + i * 22], 3, '#2b170c'); // tattoo na perna
+  rrect(128, 130, 44, 82, 8, '#fff', 4); ell(176, 218, 44, 20, '#fff', 4); line([150, 218, 205, 214], 3, '#ccc');
+  troncoRapaz(p, t);
+  // braço de trás
+  if (p.maoT) braco(-56, -146, (p.maoT[0] - p.x) / p.s, (p.maoT[1] - p.y) / p.s, { pele: PELE_R2, manga: '#1f2a44', tattoo: 1, bend: 1 });
+  if (p.garrafa) garrafa(p.garrafa[0], p.garrafa[1], 1, 0);
+  ctx.save(); ctx.translate(0, -255 + (p.bob || 0)); ctx.rotate(p.htilt || 0); cabecaRapaz(p, t); ctx.restore();
+  if (p.maoF) braco(56, -146, (p.maoF[0] - p.x) / p.s, (p.maoF[1] - p.y) / p.s, { pele: PELE_R, manga: '#1f2a44', tattoo: 1, relogio: 1, bend: -1 });
+  ctx.restore();
+}
+function garrafa(x, y, s, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  rrect(-16, -50, 32, 100, 12, '#f7f7f7', 4); rrect(-11, -66, 22, 18, 5, '#e6e6e6', 4);
+  line([-8, -40, -8, 35], 4, 'rgba(0,0,0,.08)');
+  ctx.restore();
+}
+
+// ---------- SENHOR (careca brilhante, cabelo grisalho dos lados, camisa amarela) ----------
+function cabecaSenhor(p, t) {
+  const m = p.mouth || 0, ex = p.expr || 'smile';
+  ell(-54, 4, 13, 20, PELE_S); ell(54, 4, 13, 20, PELE_S);
+  ctx.beginPath(); ctx.moveTo(-52, -10);
+  ctx.bezierCurveTo(-56, -105, 56, -105, 52, -10);
+  ctx.bezierCurveTo(54, 50, 30, 82, 0, 86); ctx.bezierCurveTo(-30, 82, -54, 50, -52, -10);
+  ctx.fillStyle = PELE_S; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  // careca brilhando
+  ell(-14, -58, 20, 9, 'rgba(255,255,255,.55)', 0, -.3);
+  if (p.glint) estrela(-20, -62, 34 * p.glint, t * 5);
+  // tufos grisalhos dos lados
+  ctx.fillStyle = '#e7e7e7';
+  for (const sx of [-1, 1]) for (let i = 0; i < 7; i++) {
+    ctx.beginPath(); ctx.arc(sx * (48 + (i % 2) * 6), -40 + i * 8, 9, 0, 7); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#999'; ctx.stroke();
+  }
+  // rugas da testa
+  for (let i = 0; i < 3; i++) line([-24, -48 + i * 9, 24, -48 + i * 9], 2.5, PELE_S2);
+  // sobrancelhas grisalhas
+  const bu = p.browUp || 0;
+  line([-38, -26 - bu * 12, -12, -22 - bu * 14], 7, '#cfcfcf'); line([38, -26 - bu * 12, 12, -22 - bu * 14], 7, '#cfcfcf');
+  // olhos: apertadinhos de sorriso
+  for (const sx of [-1, 1]) {
+    if (ex === 'laugh' || ex === 'smile') line([sx * 34, -8, sx * 24, -15, sx * 14, -8], 5);
+    else { ell(sx * 24, -10, 9, 8, '#fff', 3); ell(sx * 24 + (p.look || 0) * 3, -10, 4, 4, INK, 0); }
+    line([sx * 40, -6, sx * 46, 0], 2.5, PELE_S2); line([sx * 40, -2, sx * 47, 6], 2.5, PELE_S2); // pés de galinha
+  }
+  // nariz marcante
+  ctx.beginPath(); ctx.moveTo(-2, -8); ctx.quadraticCurveTo(-6, 22, -14, 30); ctx.quadraticCurveTo(0, 38, 14, 30);
+  ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.stroke();
+  // bigode de pele (sulcos) e maçãs do rosto
+  line([-26, 16, -36, 48], 3, PELE_S2); line([26, 16, 36, 48], 3, PELE_S2);
+  line([-44, 6, -36, 22], 3, PELE_S2); line([44, 6, 36, 22], 3, PELE_S2);
+  // boca
+  const w = 30;
+  ctx.beginPath(); ctx.moveTo(-w, 46); ctx.quadraticCurveTo(0, 50, w, 46);
+  ctx.quadraticCurveTo(0, 56 + m * 46 + (ex === 'laugh' ? 30 : 0), -w, 46); ctx.closePath();
+  ctx.fillStyle = '#3a0c0c'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+  ctx.save(); ctx.clip(); ctx.fillStyle = '#f4f1e6'; ctx.fillRect(-w, 44, w * 2, 9); ctx.restore();
+  if (ex === 'laugh') for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) {
+    const k = (t * 2.5 + i / 4) % 1; ell(sx * (40 + k * 70), -8 - Math.sin(k * 3.14) * 30 + k * 60, 6, 8, '#7fd3ff', 2);
+  }
+}
+function senhor(p, t) {
+  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(p.s * (p.dir || 1), p.s); ctx.rotate(p.rot || 0);
+  const b = p.bob || 0;
+  // pernas finas + bermuda cinza + chinelo
+  for (const sx of [-1, 1]) {
+    const fx = sx * 22 + (p.passo ? Math.sin(t * 22 + sx) * 18 : 0);
+    tube([sx * 16, -120, fx, -8], 15, PELE_S);
+    ell(fx + 8, 0, 26, 8, '#2f5fd0', 4);
+  }
+  poly([-50, -215 + b, 50, -215 + b, 54, -112, 4, -108, 0, -150, -4, -108, -54, -112], '#8e8e8e');
+  // camisa amarela
+  poly([-62, -372 + b, 62, -372 + b, 56, -200 + b, -56, -200 + b], '#ffd400');
+  line([-56, -206 + b, 56, -206 + b], 6, '#0a9e48');
+  poly([-24, -376 + b, 0, -340 + b, 24, -376 + b], '#0a9e48', 4);
+  // escudo genérico
+  poly([16, -330 + b, 42, -330 + b, 42, -312 + b, 29, -300 + b, 16, -312 + b], '#1f4fb8', 3);
+  estrela(29, -318 + b, 6, 0, '#ffd400');
+  line([-58, -300 + b, -40, -290 + b], 3, '#0a9e48'); // listra lateral
+  // braço de trás
+  if (p.maoT) braco(-56, -360 + b, (p.maoT[0] - p.x) / (p.s * (p.dir || 1)), (p.maoT[1] - p.y) / p.s, { pele: PELE_S2, manga: '#ffd400', friso: '#0a9e48', w: 18, L1: 78, L2: 74, bend: -1 });
+  // pescoço e cabeça
+  ctx.fillStyle = PELE_S; ctx.fillRect(-16, -400 + b, 32, 30); line([-16, -400 + b, -16, -374 + b], 4); line([16, -400 + b, 16, -374 + b], 4);
+  // fantasmas para o "não não não"
+  if (p.shake) for (const off of [-1, 1]) {
+    ctx.save(); ctx.globalAlpha = .28; ctx.translate(off * 26, -470 + b); cabecaSenhor(p, t); ctx.restore();
+  }
+  ctx.save(); ctx.translate((p.shake ? Math.sin(t * 45) * 16 : 0), -470 + b); ctx.rotate(p.htilt || 0); cabecaSenhor(p, t); ctx.restore();
+  // braço da frente
+  if (p.maoF) {
+    const [hx, hy] = braco(56, -360 + b, (p.maoF[0] - p.x) / (p.s * (p.dir || 1)), (p.maoF[1] - p.y) / p.s, { pele: PELE_S, manga: '#ffd400', friso: '#0a9e48', w: 18, L1: 78, L2: 74, bend: 1 });
+    if (p.dedo) { // dedinho balançando "não"
+      ctx.save(); ctx.translate(hx, hy - 8); ctx.rotate(Math.sin(t * 30) * .6);
+      tube([0, 0, 0, -38], 9, PELE_S); ctx.restore();
+    }
+    if (p.cel) { // celular (cresce!)
+      ctx.save(); ctx.translate(hx, hy - 20); ctx.scale(p.cel, p.cel); ctx.rotate(-.15);
+      rrect(-20, -40, 40, 72, 8, '#111', 4);
+      const g = ctx.createLinearGradient(0, -34, 0, 26); g.addColorStop(0, '#7ff7ff'); g.addColorStop(1, '#4b7bff');
+      rrect(-15, -34, 30, 58, 4, g, 0);
+      texto('R$', 0, -6, 13, '#fff', 0, 1, '#2442a8');
+      ctx.restore();
+      if (p.cel > 1.4) { ctx.save(); ctx.globalAlpha = .25; ell(hx, hy - 30, 90 * p.cel / 2, 90 * p.cel / 2, '#bff', 0); ctx.restore(); }
+    }
+  }
+  ctx.restore();
+}
+
+// ---------- efeitos ----------
+function poeira(x, y, t, t0, n = 8, dir = 1) {
+  for (let i = 0; i < n; i++) {
+    const age = t - t0 - rnd(i) * .2; if (age < 0 || age > .7) continue;
+    const k = age / .7;
+    ctx.save(); ctx.globalAlpha = 1 - k;
+    ell(x + dir * (rnd(i + 2) * 60 + k * 90), y - k * 40 - rnd(i + 4) * 20, 14 + k * 24, 10 + k * 16, '#e7e2d8', 3);
+    ctx.restore();
+  }
+}
+function linhasVelocidade(x0, x1, y0, y1, t) {
+  for (let i = 0; i < 10; i++) { const y = y0 + rnd(i) * (y1 - y0), k = (t * 4 + rnd(i + 3)) % 1;
+    line([lerp(x0, x1, k), y, lerp(x0, x1, k) + 110, y], 5, 'rgba(255,255,255,.9)'); }
+}
+function estouro(x, y, r, t, cor = '#ffd23f') {
+  ctx.save(); ctx.translate(x, y); ctx.beginPath();
+  for (let k = 0; k < 24; k++) { const rr = k % 2 ? r * .55 : r * (1 + rnd(k) * .3), a = k * Math.PI / 12; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+  ctx.closePath(); ctx.fillStyle = cor; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke(); ctx.restore();
+}
+
+// ---------- legendas no estilo do vídeo (palavra em destaque amarela) ----------
+const LEG = [
+  [0.45, 1.9, ['1', 'AQUI', '*ENTÃO']],
+  [1.9, 2.6, ['*AGORA', 'PARA', 'NÓS']],
+  [2.6, 3.3, ['*RESOLVER']],
+  [3.9, 4.9, ['1', '*É', '*ASSIM,']],
+  [5.7, 6.6, ['PODE', '*FECHAR?']],
+  [9.8, 11.4, ['*NÃO,', 'NÃO,', 'NÃO.']],
+  [12.4, 13.1, ['QUE', '*GASOLINA', 'DA']],
+  [13.1, 14.5, ['*PESTE', 'É', 'ESSA?']],
+];
+function legendas(t) {
+  for (const [a, b, ws] of LEG) {
+    if (t < a || t >= b) continue;
+    const k = backOut(prog(t, a, a + .18));
+    ctx.save(); ctx.translate(W / 2, 735); ctx.scale(k, k);
+    ctx.font = '900 44px "DejaVu Sans", Arial, sans-serif'; ctx.textBaseline = 'middle';
+    const parts = ws.map(w => ({ s: w.replace('*', ''), hl: w[0] === '*' }));
+    const sp = 14, wid = parts.reduce((s, p) => s + ctx.measureText(p.s).width, 0) + sp * (parts.length - 1);
+    let x = -wid / 2;
+    for (const p of parts) {
+      ctx.lineWidth = 9; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.strokeText(p.s, x, 0);
+      ctx.fillStyle = p.hl ? '#ffe600' : '#fff'; ctx.fillText(p.s, x, 0);
+      x += ctx.measureText(p.s).width + sp;
+    }
+    ctx.restore();
+  }
+}
+function camera(z, fx, fy, sh = 0, t = 0) {
+  ctx.translate(W / 2 + noise(t, 1) * sh, H / 2 + noise(t, 2) * sh); ctx.scale(z, z); ctx.translate(-fx, -fy);
+}
+
+// ---------- quadro ----------
+window.draw = function (t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const e = env(t);
+  const falaR = (t < 8.4 || t >= 12.2) ? e : 0;  // quem está falando
+  const falaS = (t >= 8.4 && t < 12.2) ? e : 0;
+
+  if (t < 12.2) {
+    // ---- cenas na caminhonete ----
+    let z, fx, fy, sh = 0;
+    if (t < 3.3) { z = lerp(1.35, 1.5, prog(t, 0, 3.3)); fx = 190; fy = 470; }
+    else if (t < 4.3) { const k = ease(prog(t, 3.3, 3.8)); z = lerp(1.5, 1.15, k); fx = lerp(190, 290, k); fy = lerp(470, 600, k); }
+    else if (t < 8.4) { z = 1.15 + (t > 4.6 && t < 8.2 ? .05 : 0); fx = 290; fy = 600; sh = t > 4.6 && t < 8.2 ? 4 : 0; }
+    else if (t < 9.9) { z = lerp(1.0, 1.25, ease(prog(t, 8.4, 9.3))); fx = 270; fy = 480; }
+    else { z = 1.15; fx = 300; fy = 560; sh = 3; }
+    ctx.save(); camera(z, fx, fy, sh, t);
+    cenario(t); caminhonete();
+
+    // poses do rapaz
+    let R = { x: 120, y: 650, s: 1, mouth: falaR, bob: Math.sin(t * 9) * 3 * falaR };
+    let S = null;
+    if (t < 3.3) {
+      Object.assign(R, {
+        maoF: [250 + Math.sin(t * 7) * 30, 520 + Math.cos(t * 9) * 25], maoT: [190, 640],
+        browUp: t > 2.6 ? Math.abs(Math.sin(t * 16)) : falaR * .5,
+        glint: t > .2 && t < .8 ? Math.sin(prog(t, .2, .8) * Math.PI) : 0, htilt: Math.sin(t * 3) * .06 });
+      R.garrafa = null;
+    } else if (t < 4.6) {
+      const k = ease(prog(t, 4.1, 4.6));
+      Object.assign(R, { maoF: [lerp(240, 330, k), lerp(560, 575, k)], maoT: [190, 640], look: 1, browUp: .4 });
+      const ent = backOut(prog(t, 3.3, 3.85));
+      S = { x: lerp(820, 470, ent), y: 920, s: 1.02, rot: lerp(-.25, 0, ent), passo: t < 3.9,
+            maoF: [lerp(430, 345, k), lerp(700, 575, k)], maoT: [420, 760], mouth: 0, expr: 'smile',
+            glint: t > 3.9 && t < 4.4 ? Math.sin(prog(t, 3.9, 4.4) * Math.PI) : 0 };
+      if (t < 3.9) linhasVelocidade(620, 900, 400, 900, t);
+      poeira(560, 910, t, 3.75, 8, 1);
+    } else if (t < 8.4) {
+      // aperto de mão turbinado
+      const pump = Math.sin((t - 4.6) * 26) * 32 * (t < 8.1 ? 1 : 0);
+      const hy = 575 + pump;
+      const dollar = t > 5.6 && t < 8.2;
+      Object.assign(R, { maoF: [338, hy], maoT: [190, 640], expr: dollar ? 'dollar' : 'normal', look: 1,
+        bob: pump * .15, browUp: dollar ? .8 : .3, smile: 1 });
+      S = { x: 470, y: 920, s: 1.02, maoF: [348, hy], maoT: [420, 760], mouth: 0, expr: 'smile', bob: pump * .12,
+            htilt: Math.sin(t * 13) * .05 };
+    } else if (t < 9.9) {
+      const k = ease(prog(t, 8.4, 9.1));
+      Object.assign(R, { maoF: [250, 610], maoT: [190, 640], expr: t > 9.0 ? 'squint' : 'normal', htilt: -k * .15, browUp: .6 });
+      R.garrafa = [lerp(180, 160, k), 590];
+      S = { x: 470, y: 920, s: 1.02, maoF: [lerp(400, 300, k), lerp(640, 470, k)], maoT: [420, 760],
+            cel: lerp(1, 2.8, ease(prog(t, 8.8, 9.6))), mouth: falaS, expr: 'talk', look: -1 };
+    } else {
+      // "não, não, não"
+      Object.assign(R, { maoF: [250, 610], maoT: [190, 640], expr: 'shock', mouth: .9 + Math.sin(t * 9) * .1, glassDrop: ease(prog(t, 9.9, 10.4)),
+        htilt: -.1, suor: 1 });
+      R.garrafa = [160, 590];
+      S = { x: 470, y: 920, s: 1.02, maoF: [400, 420], dedo: 1, maoT: [400, 700], cel: 1, mouth: falaS, expr: 'talk', shake: t < 11.4 };
+    }
+    rapazSentado(R, t);
+    if (S) senhor(S, t);
+    if (t > 4.6 && t < 5.0) { const k = prog(t, 4.6, 5.0); estouro(343, 575, 70 * backOut(clamp(k * 3)), t); texto('PÁ!', 343, 575, 36, '#fff', -.1, backOut(clamp(k * 3))); }
+    if (t > 4.6 && t < 8.1) for (let i = 0; i < 3; i++) line([300 - i * 14, 520 - i * 10, 280 - i * 14, 510 - i * 10], 4, '#fff');
+    ctx.restore();
+  } else if (t < 15.2) {
+    // ---- close no rapaz: "que gasolina da peste é essa?" ----
+    const sh = t > 12.8 && t < 13.4 ? 10 : 2;
+    ctx.save(); camera(1.7, 330, 440, sh, t);
+    cenario(t);
+    ctx.save(); ctx.translate(120, 0); caminhonete(); ctx.restore();
+    // senhor ao fundo rindo
+    const sai = ease(prog(t, 14.6, 15.2));
+    senhor({ x: 440, y: 900, s: .95, maoF: [440, 640 + Math.sin(t * 20) * 10], maoT: [520, 640], cel: 1, mouth: 0,
+             expr: 'laugh', bob: Math.abs(Math.sin(t * 14)) * -8, htilt: Math.sin(t * 7) * .08 }, t);
+    ctx.restore();
+
+    ctx.save(); camera(1, 288, 512, sh, t);
+    const gole = t < 12.8;
+    const reac = prog(t, 12.8, 13.1);
+    const vermelho = t >= 12.8 ? 1 - prog(t, 13.5, 14.6) * .6 : 0;
+    const x = lerp(230, -260, sai);
+    ctx.save(); ctx.translate(x, 1030); ctx.scale(1.95, 1.95);
+    troncoRapaz({}, t);
+    const P = { mouth: gole ? 0 : Math.max(falaR, t < 13.2 ? .8 : 0), expr: t >= 12.8 && t < 13.35 ? 'pop' : (t < 12.8 ? 'squint' : 'shock'),
+      pop: backOut(clamp(reac * 1.5)), red: vermelho, vapor: t > 12.85, fogo: t > 12.85 && t < 13.4,
+      glassDrop: t > 13.35 ? .35 : 0, htilt: gole ? -.25 : Math.sin(t * 8) * .05, browUp: t > 12.8 ? 1 : 0 };
+    // braço da garrafa
+    const hand = gole ? [78, -232] : [95, -60 + Math.sin(t * 6) * 10];
+    braco(56, -146, hand[0], hand[1], { pele: PELE_R, manga: '#1f2a44', tattoo: 1, relogio: 1, bend: -1 });
+    ctx.save(); ctx.translate(0, -255); ctx.rotate(P.htilt); cabecaRapaz(P, t); ctx.restore();
+    garrafa(gole ? 50 : hand[0] + 10, gole ? -238 : hand[1] - 40, .9, gole ? -2.03 : .2);
+    if (t > 13.4) braco(-56, -146, -80 + Math.sin(t * 10) * 25, -170 + Math.cos(t * 12) * 20, { pele: PELE_R2, manga: '#1f2a44', tattoo: 1, bend: 1 });
+    ctx.restore();
+    if (t > 12.8 && t < 13.4) texto('!!!', 470, 300, 80, '#ff3b3b', .2, backOut(clamp(reac * 2)));
+    if (gole) texto('glub glub', 440, 300, 34, '#bfe9ff', .15, 1 + Math.sin(t * 20) * .05);
+    if (sai > 0) poeira(x + 300, 950, t, 14.6, 10, 1);
+    ctx.restore();
+  } else {
+    // ---- FIM ----
+    ctx.fillStyle = '#ffd400'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#0a9e48'; ctx.fillRect(0, H * .44, W, 140);
+    const k = backOut(prog(t, 15.2, 15.6));
+    texto('NEGÓCIO', W / 2, 360, 70, '#fff', -.05, k);
+    texto('FECHADO?', W / 2, 450, 70, '#fff', .04, k);
+    texto('(com gasolina da peste)', W / 2, 560, 30, '#ffe600', 0, backOut(prog(t, 15.6, 16)));
+  }
+  legendas(t);
+};
+draw(0);
+</script>
+</body></html>
