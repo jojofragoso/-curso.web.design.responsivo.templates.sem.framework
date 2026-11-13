@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animações Engraçadas</title>
+  <style>
+    /* ===== Base ===== */
+    :root {
+      --bg: #fff8e7;
+      --card: #ffffff;
+      --ink: #2b2d42;
+      --muted: #6c6f85;
+      --rosa: #ff6fa5;
+      --amarelo: #ffd23f;
+      --verde: #3ddc97;
+      --azul: #4cc9f0;
+      --roxo: #9b5de5;
+      --laranja: #ff8c42;
+      --sombra: 0 6px 0 rgba(43, 45, 66, .12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      padding: 48px 16px 24px;
+    }
+
+    header h1 {
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      display: inline-block;
+    }
+
+    header h1 span {
+      display: inline-block;
+      animation: pula-letra 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pula-letra {
+      0%, 60%, 100% { transform: translateY(0) rotate(0); }
+      30% { transform: translateY(-14px) rotate(-6deg); }
+    }
+
+    header p { color: var(--muted); margin-top: 8px; }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px 16px 64px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 3px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: var(--sombra);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .palco {
+      height: 220px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .card h2 { font-size: 1.15rem; padding: 14px 16px 2px; }
+    .card p  { font-size: .92rem; color: var(--muted); padding: 0 16px 16px; }
+
+    /* ===== 1. Gelatina dançante ===== */
+    .palco-gelatina { background: #e0fbff; }
+
+    .gelatina {
+      width: 110px;
+      height: 100px;
+      background: var(--verde);
+      border-radius: 50% 50% 18px 18px / 60% 60% 18px 18px;
+      position: relative;
+      transform-origin: bottom center;
+      animation: treme 1.1s ease-in-out infinite;
+      box-shadow: inset -12px -10px 0 rgba(0,0,0,.08);
+    }
+
+    .gelatina::after { /* brilho */
+      content: "";
+      position: absolute;
+      top: 16px; left: 18px;
+      width: 18px; height: 10px;
+      background: rgba(255,255,255,.7);
+      border-radius: 50%;
+      transform: rotate(-30deg);
+    }
+
+    @keyframes treme {
+      0%, 100% { transform: scale(1, 1) skewX(0); }
+      20% { transform: scale(1.15, .85) skewX(6deg); }
+      40% { transform: scale(.9, 1.12) skewX(-6deg); }
+      60% { transform: scale(1.06, .94) skewX(3deg); }
+      80% { transform: scale(.97, 1.03) skewX(-2deg); }
+    }
+
+    .olhos {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 18px;
+    }
+
+    .olho {
+      width: 14px; height: 14px;
+      background: var(--ink);
+      border-radius: 50%;
+      animation: pisca 3.5s infinite;
+    }
+
+    @keyframes pisca {
+      0%, 92%, 100% { transform: scaleY(1); }
+      95% { transform: scaleY(.1); }
+    }
+
+    .boca {
+      position: absolute;
+      top: 60px; left: 50%;
+      width: 26px; height: 13px;
+      margin-left: -13px;
+      border: 4px solid var(--ink);
+      border-top: none;
+      border-radius: 0 0 26px 26px;
+    }
+
+    .prato {
+      position: absolute;
+      bottom: 34px;
+      width: 160px; height: 16px;
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      z-index: -1;
+    }
+
+    .palco-gelatina .gelatina { margin-top: 20px; }
+
+    /* ===== 2. Torrada saltitante ===== */
+    .palco-torrada { background: #fff1d6; }
+
+    .torradeira {
+      position: absolute;
+      bottom: 30px;
+      width: 150px; height: 80px;
+      background: #c9d1e0;
+      border: 3px solid var(--ink);
+      border-radius: 22px 22px 10px 10px;
+      z-index: 2;
+    }
+
+    .torradeira::before { /* fenda */
+      content: "";
+      position: absolute;
+      top: 8px; left: 30px;
+      width: 90px; height: 8px;
+      background: var(--ink);
+      border-radius: 4px;
+    }
+
+    .torradeira::after { /* alavanca */
+      content: "";
+      position: absolute;
+      right: -14px; top: 26px;
+      width: 14px; height: 10px;
+      background: var(--ink);
+      border-radius: 0 4px 4px 0;
+      animation: alavanca 2.4s infinite;
+    }
+
+    @keyframes alavanca {
+      0%, 15% { transform: translateY(30px); }
+      20%, 100% { transform: translateY(0); }
+    }
+
+    .torrada {
+      position: absolute;
+      bottom: 80px;
+      width: 76px; height: 72px;
+      background: #e8a85c;
+      border: 3px solid #8a5a2b;
+      border-radius: 34px 34px 8px 8px;
+      z-index: 1;
+      animation: voa-torrada 2.4s cubic-bezier(.3,.1,.4,1) infinite;
+    }
+
+    .torrada .olhos { top: 22px; gap: 14px; }
+    .torrada .olho { width: 10px; height: 10px; }
+
+    .torrada .boca-o {
+      position: absolute;
+      top: 40px; left: 50%;
+      width: 12px; height: 14px;
+      margin-left: -6px;
+      background: var(--ink);
+      border-radius: 50%;
+    }
+
+    @keyframes voa-torrada {
+      0%, 15%  { transform: translateY(70px) rotate(0); }
+      40%      { transform: translateY(-60px) rotate(200deg); }
+      65%      { transform: translateY(0) rotate(360deg); }
+      72%      { transform: translateY(-12px) rotate(360deg); }
+      80%,100% { transform: translateY(0) rotate(360deg); }
+    }
+
+    /* ===== 3. Bola tonta (squash & stretch) ===== */
+    .palco-bola { background: #f3e8ff; }
+
+    .chao {
+      position: absolute;
+      bottom: 30px; left: 0; right: 0;
+      height: 3px;
+      background: var(--ink);
+    }
+
+    .bola {
+      position: absolute;
+      bottom: 33px;
+      width: 70px; height: 70px;
+      background: var(--rosa);
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      transform-origin: bottom center;
+      animation: quica .9s cubic-bezier(.5,0,.5,1) infinite alternate;
+    }
+
+    .bola .olhos { top: 20px; gap: 12px; }
+    .bola .olho {
+      width: 12px; height: 12px;
+      background: #fff;
+      border: 3px solid var(--ink);
+      animation: gira-olho .9s linear infinite;
+    }
+
+    @keyframes gira-olho {
+      to { transform: rotate(360deg); }
+    }
+
+    .bola .olho::after {
+      content: "";
+      display: block;
+      width: 4px; height: 4px;
+      background: var(--ink);
+      border-radius: 50%;
+    }
+
+    .bola .lingua {
+      position: absolute;
+      top: 42px; left: 50%;
+      width: 14px; height: 14px;
+      margin-left: -7px;
+      background: #ff3864;
+      border: 3px solid var(--ink);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+    }
+
+    @keyframes quica {
+      0%   { transform: translateY(0) scale(1.35, .65); }
+      12%  { transform: translateY(-20px) scale(.85, 1.2); }
+      100% { transform: translateY(-100px) scale(1, 1); }
+    }
+
+    .sombra-bola {
+      position: absolute;
+      bottom: 24px;
+      width: 70px; height: 12px;
+      background: rgba(43,45,66,.2);
+      border-radius: 50%;
+      animation: sombra .9s cubic-bezier(.5,0,.5,1) infinite alternate;
+    }
+
+    @keyframes sombra {
+      0%   { transform: scale(1.2); opacity: .5; }
+      100% { transform: scale(.5); opacity: .15; }
+    }
+
+    /* ===== 4. Fantasma tímido ===== */
+    .palco-fantasma {
+      background: #2b2d42;
+      cursor: pointer;
+    }
+
+    .fantasma {
+      width: 90px; height: 110px;
+      background: #fff;
+      border-radius: 45px 45px 0 0;
+      position: relative;
+      animation: flutua 2.2s ease-in-out infinite;
+      transition: opacity .4s, transform .4s;
+    }
+
+    .fantasma::after { /* barra ondulada */
+      content: "";
+      position: absolute;
+      bottom: -14px; left: 0;
+      width: 100%; height: 16px;
+      background:
+        radial-gradient(circle at 11px 0, #fff 11px, transparent 12px) 0 0 / 22.5px 16px repeat-x;
+    }
+
+    .fantasma .olhos { top: 36px; gap: 20px; }
+
+    .fantasma .bochecha {
+      position: absolute;
+      top: 54px;
+      width: 14px; height: 8px;
+      background: var(--rosa);
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .fantasma .bochecha.esq { left: 14px; }
+    .fantasma .bochecha.dir { right: 14px; }
+
+    .fantasma .boca-o {
+      position: absolute;
+      top: 60px; left: 50%;
+      width: 12px; height: 12px;
+      margin-left: -6px;
+      background: var(--ink);
+      border-radius: 50%;
+      transition: transform .3s;
+    }
+
+    @keyframes flutua {
+      0%, 100% { translate: 0 0; rotate: -4deg; }
+      50% { translate: 0 -16px; rotate: 4deg; }
+    }
+
+    .palco-fantasma:hover .fantasma,
+    .palco-fantasma:focus-visible .fantasma {
+      opacity: .25;
+      transform: scale(.85);
+    }
+    .palco-fantasma:hover .bochecha,
+    .palco-fantasma:focus-visible .bochecha { opacity: 1; }
+    .palco-fantasma:hover .boca-o,
+    .palco-fantasma:focus-visible .boca-o { transform: scaleX(1.8) scaleY(.4); }
+
+    .boo {
+      position: absolute;
+      top: 18px; right: 18px;
+      color: var(--amarelo);
+      font-weight: bold;
+      font-size: .9rem;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .palco-fantasma:hover .boo,
+    .palco-fantasma:focus-visible .boo { opacity: 1; }
+
+    /* ===== 5. Olhos curiosos (seguem o mouse) ===== */
+    .palco-olhos { background: var(--amarelo); }
+
+    .cara-olhos { display: flex; gap: 14px; }
+
+    .olhao {
+      width: 80px; height: 80px;
+      background: #fff;
+      border: 4px solid var(--ink);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      animation: pisca-grande 4s infinite;
+    }
+
+    @keyframes pisca-grande {
+      0%, 94%, 100% { transform: scaleY(1); }
+      97% { transform: scaleY(.08); }
+    }
+
+    .pupila {
+      width: 30px; height: 30px;
+      background: var(--ink);
+      border-radius: 50%;
+      position: relative;
+      transition: transform .08s linear;
+    }
+
+    .pupila::after {
+      content: "";
+      position: absolute;
+      top: 5px; left: 6px;
+      width: 8px; height: 8px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    /* ===== 6. Botão fujão ===== */
+    .palco-botao { background: #ffe3ec; }
+
+    .fujao {
+      position: absolute;
+      padding: 12px 22px;
+      font: inherit;
+      font-weight: bold;
+      color: #fff;
+      background: var(--roxo);
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      box-shadow: 0 4px 0 var(--ink);
+      cursor: pointer;
+      transition: left .25s cubic-bezier(.3,1.6,.5,1), top .25s cubic-bezier(.3,1.6,.5,1);
+      left: 50%; top: 50%;
+      translate: -50% -50%;
+      white-space: nowrap;
+    }
+
+    .placar {
+      position: absolute;
+      bottom: 10px; left: 0; right: 0;
+      text-align: center;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    /* ===== 7. Nuvem chorona ===== */
+    .palco-nuvem { background: #dff3ff; }
+
+    .nuvem {
+      position: absolute;
+      top: 40px;
+      width: 140px; height: 54px;
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-radius: 40px;
+      animation: soluco 1.2s ease-in-out infinite;
+      z-index: 2;
+    }
+
+    .nuvem::before,
+    .nuvem::after {
+      content: "";
+      position: absolute;
+      background: #fff;
+      border: 3px solid var(--ink);
+      border-bottom-color: transparent;
+      border-radius: 50%;
+    }
+    .nuvem::before { width: 60px; height: 60px; top: -32px; left: 20px; border-right-color: transparent; }
+    .nuvem::after  { width: 46px; height: 46px; top: -22px; right: 22px; border-left-color: transparent; }
+
+    .nuvem .rosto {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    .nuvem .olho-triste {
+      position: absolute;
+      top: 14px;
+      width: 16px; height: 8px;
+      border: 3px solid var(--ink);
+      border-top: none;
+      border-radius: 0 0 16px 16px;
+    }
+    .nuvem .olho-triste.esq { left: 40px; transform: rotate(10deg); }
+    .nuvem .olho-triste.dir { right: 40px; transform: rotate(-10deg); }
+
+    .nuvem .boca-triste {
+      position: absolute;
+      top: 32px; left: 50%;
+      width: 22px; height: 10px;
+      margin-left: -11px;
+      border: 3px solid var(--ink);
+      border-bottom: none;
+      border-radius: 22px 22px 0 0;
+    }
+
+    @keyframes soluco {
+      0%, 100% { transform: translateY(0) scale(1); }
+      10% { transform: translateY(-6px) scale(1.04, .96); }
+      20% { transform: translateY(0) scale(1); }
+    }
+
+    .gota {
+      position: absolute;
+      top: 96px;
+      width: 10px; height: 14px;
+      background: var(--azul);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      animation: chuva 1s linear infinite;
+      opacity: 0;
+    }
+    .gota:nth-child(2) { left: calc(50% - 40px); animation-delay: .1s; }
+    .gota:nth-child(3) { left: calc(50% - 15px); animation-delay: .5s; }
+    .gota:nth-child(4) { left: calc(50% + 10px); animation-delay: .25s; }
+    .gota:nth-child(5) { left: calc(50% + 35px); animation-delay: .7s; }
+
+    @keyframes chuva {
+      0%   { transform: translateY(0); opacity: 0; }
+      10%  { opacity: 1; }
+      100% { transform: translateY(110px); opacity: 0; }
+    }
+
+    .poca {
+      position: absolute;
+      bottom: 14px;
+      width: 120px; height: 14px;
+      background: var(--azul);
+      border-radius: 50%;
+      opacity: .5;
+      animation: enche 6s ease-in-out infinite;
+    }
+
+    @keyframes enche {
+      0%, 100% { transform: scaleX(.5); }
+      50% { transform: scaleX(1.2); }
+    }
+
+    /* ===== 8. Minhoca preguiçosa ===== */
+    .palco-minhoca { background: #e7f9e9; }
+
+    .minhoca {
+      display: flex;
+      align-items: flex-end;
+      animation: anda 6s linear infinite;
+    }
+
+    .gomo {
+      width: 34px; height: 34px;
+      background: var(--laranja);
+      border: 3px solid var(--ink);
+      border-radius: 50%;
+      margin-left: -8px;
+      animation: ondula .6s ease-in-out infinite;
+    }
+    .gomo:nth-child(1) { animation-delay: -.0s; }
+    .gomo:nth-child(2) { animation-delay: -.1s; }
+    .gomo:nth-child(3) { animation-delay: -.2s; }
+    .gomo:nth-child(4) { animation-delay: -.3s; }
+    .gomo:nth-child(5) { animation-delay: -.4s; }
+
+    .gomo.cabeca {
+      width: 46px; height: 46px;
+      position: relative;
+      background: #ffa76b;
+    }
+    .gomo.cabeca .olhos { top: 10px; gap: 8px; }
+    .gomo.cabeca .olho { width: 8px; height: 8px; animation: sono 3s infinite; }
+
+    @keyframes sono {
+      0%, 40%, 100% { transform: scaleY(1); }
+      50%, 80% { transform: scaleY(.15); }
+    }
+
+    .gomo.cabeca .sorriso {
+      position: absolute;
+      top: 24px; left: 50%;
+      width: 14px; height: 7px;
+      margin-left: -7px;
+      border: 3px solid var(--ink);
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+    }
+
+    .zzz {
+      position: absolute;
+      top: -18px; right: -14px;
+      font-weight: bold;
+      font-size: .8rem;
+      animation: zz 2s ease-out infinite;
+    }
+
+    @keyframes zz {
+      0%   { opacity: 0; transform: translate(0, 0) scale(.6); }
+      30%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(12px, -22px) scale(1.2); }
+    }
+
+    @keyframes ondula {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+
+    @keyframes anda {
+      0%   { transform: translateX(-160px); }
+      100% { transform: translateX(160px); }
+    }
+
+    footer {
+      text-align: center;
+      padding: 0 16px 40px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    /* Acessibilidade: menos movimento para quem pede */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .palco { height: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1 aria-label="Animações Engraçadas">
+      <span aria-hidden="true">🤪</span>
+      <span style="animation-delay:.05s" aria-hidden="true">A</span><span style="animation-delay:.1s" aria-hidden="true">n</span><span style="animation-delay:.15s" aria-hidden="true">i</span><span style="animation-delay:.2s" aria-hidden="true">m</span><span style="animation-delay:.25s" aria-hidden="true">a</span><span style="animation-delay:.3s" aria-hidden="true">ç</span><span style="animation-delay:.35s" aria-hidden="true">õ</span><span style="animation-delay:.4s" aria-hidden="true">e</span><span style="animation-delay:.45s" aria-hidden="true">s</span>
+      <span style="animation-delay:.55s" aria-hidden="true">E</span><span style="animation-delay:.6s" aria-hidden="true">n</span><span style="animation-delay:.65s" aria-hidden="true">g</span><span style="animation-delay:.7s" aria-hidden="true">r</span><span style="animation-delay:.75s" aria-hidden="true">a</span><span style="animation-delay:.8s" aria-hidden="true">ç</span><span style="animation-delay:.85s" aria-hidden="true">a</span><span style="animation-delay:.9s" aria-hidden="true">d</span><span style="animation-delay:.95s" aria-hidden="true">a</span><span style="animation-delay:1s" aria-hidden="true">s</span>
+    </h1>
+    <p>Feitas só com HTML, CSS e um pouquinho de JavaScript — sem framework!</p>
+  </header>
+
+  <main>
+    <!-- 1 -->
+    <article class="card">
+      <div class="palco palco-gelatina">
+        <div class="prato"></div>
+        <div class="gelatina">
+          <div class="olhos"><div class="olho"></div><div class="olho"></div></div>
+          <div class="boca"></div>
+        </div>
+      </div>
+      <h2>Gelatina dançante</h2>
+      <p><code>scale</code> + <code>skewX</code> em keyframes dão o efeito “mole”.</p>
+    </article>
+
+    <!-- 2 -->
+    <article class="card">
+      <div class="palco palco-torrada">
+        <div class="torrada">
+          <div class="olhos"><div class="olho"></div><div class="olho"></div></div>
+          <div class="boca-o"></div>
+        </div>
+        <div class="torradeira"></div>
+      </div>
+      <h2>Torrada acrobata</h2>
+      <p>Pula da torradeira com mortal e aterrissa com estilo.</p>
+    </article>
+
+    <!-- 3 -->
+    <article class="card">
+      <div class="palco palco-bola">
+        <div class="chao"></div>
+        <div class="sombra-bola"></div>
+        <div class="bola">
+          <div class="olhos"><div class="olho"></div><div class="olho"></div></div>
+          <div class="lingua"></div>
+        </div>
+      </div>
+      <h2>Bola tonta</h2>
+      <p>Squash &amp; stretch: achata no chão, estica no ar e fica zonza.</p>
+    </article>
+
+    <!-- 4 -->
+    <article class="card">
+      <div class="palco palco-fantasma" tabindex="0" aria-label="Fantasma tímido: passe o mouse">
+        <span class="boo">não olha! 🙈</span>
+        <div class="fantasma">
+          <div class="olhos"><div class="olho"></div><div class="olho"></div></div>
+          <div class="bochecha esq"></div><div class="bochecha dir"></div>
+          <div class="boca-o"></div>
+        </div>
+      </div>
+      <h2>Fantasma tímido</h2>
+      <p>Passe o mouse (ou toque): ele fica vermelho e some de vergonha.</p>
+    </article>
+
+    <!-- 5 -->
+    <article class="card">
+      <div class="palco palco-olhos" id="palcoOlhos">
+        <div class="cara-olhos">
+          <div class="olhao"><div class="pupila"></div></div>
+          <div class="olhao"><div class="pupila"></div></div>
+        </div>
+      </div>
+      <h2>Olhos curiosos</h2>
+      <p>Seguem o mouse (ou o dedo) pela página inteira. 👀</p>
+    </article>
+
+    <!-- 6 -->
+    <article class="card">
+      <div class="palco palco-botao" id="palcoBotao">
+        <button class="fujao" id="fujao" type="button">Clique em mim!</button>
+        <div class="placar" id="placar">Fugas: 0</div>
+      </div>
+      <h2>Botão fujão</h2>
+      <p>Tente clicar… se conseguir. 😏</p>
+    </article>
+
+    <!-- 7 -->
+    <article class="card">
+      <div class="palco palco-nuvem">
+        <div class="nuvem">
+          <div class="rosto">
+            <div class="olho-triste esq"></div>
+            <div class="olho-triste dir"></div>
+            <div class="boca-triste"></div>
+          </div>
+        </div>
+        <div class="gota"></div>
+        <div class="gota"></div>
+        <div class="gota"></div>
+        <div class="gota"></div>
+        <div class="poca"></div>
+      </div>
+      <h2>Nuvem chorona</h2>
+      <p>Soluça, chora e ainda faz uma poça. Drama total.</p>
+    </article>
+
+    <!-- 8 -->
+    <article class="card">
+      <div class="palco palco-minhoca">
+        <div class="minhoca">
+          <div class="gomo"></div>
+          <div class="gomo"></div>
+          <div class="gomo"></div>
+          <div class="gomo"></div>
+          <div class="gomo cabeca">
+            <span class="zzz">z</span>
+            <div class="olhos"><div class="olho"></div><div class="olho"></div></div>
+            <div class="sorriso"></div>
+          </div>
+        </div>
+      </div>
+      <h2>Minhoca sonâmbula</h2>
+      <p><code>animation-delay</code> negativo em cada gomo cria a onda.</p>
+    </article>
+  </main>
+
+  <footer>
+    <a href="index.html">← voltar</a>
+  </footer>
+
+  <script>
+    // ===== Olhos que seguem o ponteiro =====
+    const pupilas = document.querySelectorAll('.pupila');
+
+    function olhar(x, y) {
+      pupilas.forEach(p => {
+        const olho = p.parentElement.getBoundingClientRect();
+        const cx = olho.left + olho.width / 2;
+        const cy = olho.top + olho.height / 2;
+        const ang = Math.atan2(y - cy, x - cx);
+        const dist = Math.min(18, Math.hypot(x - cx, y - cy) / 8);
+        p.style.transform = `translate(${Math.cos(ang) * dist}px, ${Math.sin(ang) * dist}px)`;
+      });
+    }
+
+    window.addEventListener('pointermove', e => olhar(e.clientX, e.clientY));
+
+    // ===== Botão fujão =====
+    const palco = document.getElementById('palcoBotao');
+    const botao = document.getElementById('fujao');
+    const placar = document.getElementById('placar');
+    const frases = ['Nope!', 'Quase!', 'Muito lento 🐢', 'Hehehe', 'Tenta de novo', 'Aqui não!', 'Clique em mim!'];
+    let fugas = 0;
+
+    function foge() {
+      const area = palco.getBoundingClientRect();
+      const b = botao.getBoundingClientRect();
+      const margemX = b.width / 2 + 8;
+      const margemY = b.height / 2 + 8;
+      const x = margemX + Math.random() * (area.width - margemX * 2);
+      const y = margemY + Math.random() * (area.height - margemY * 2 - 24);
+      botao.style.left = x + 'px';
+      botao.style.top = y + 'px';
+      botao.textContent = frases[fugas % frases.length];
+      fugas++;
+      placar.textContent = 'Fugas: ' + fugas;
+    }
+
+    botao.addEventListener('pointerenter', foge);
+    botao.addEventListener('click', () => {
+      // Se alguém conseguiu (ex.: teclado ou toque rápido)
+      botao.textContent = 'Ok, você venceu 🏆';
+      placar.textContent = 'Você me pegou depois de ' + fugas + ' fugas!';
+      fugas = 0;
+    });
+  </script>
+</body>
+</html>
