@@ -516,6 +516,46 @@ scene(98.79, (ctx, t) => {
   card(ctx, W / 2, 380, ['PORTUGAL · SÉC. XVI'], { t: prog(t, 99.3, 99.6) * (1 - prog(t, 101.2, 101.3)), size: 64 });
 });
 
+
+// 19. end card: Mundo Paralelo
+scene(103.95, (ctx, t) => {
+  const lt = t - 103.95;
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1A120B'); g.addColorStop(1, '#2B1D12'); ctx.fillStyle = g; ctx.fillRect(-200, -200, W + 400, H + 400);
+  rays(ctx, W / 2, 1000, 1400, 24, t * .15, C.gold, .08);
+  // logo: two mirrored globes (mundo paralelo)
+  const k = pop(t, 103.95, .5);
+  ctx.save(); ctx.translate(W / 2, 470); ctx.scale(k, k);
+  for (const [dx, a] of [[-70, 1], [70, .55]]) {
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(dx, 0);
+    ctx.fillStyle = C.ocean; ctx.beginPath(); ctx.arc(0, 0, 120, 0, 7); ctx.fill();
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 10; ctx.stroke();
+    ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(0, 0, 50, 120, 0, 0, 7); ctx.moveTo(-120, 0); ctx.lineTo(120, 0); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  text(ctx, 'MUNDO PARALELO', W / 2, 700, { size: 104 * pop(t, 104.1, .4), weight: 900, color: '#fff' });
+  ctx.fillStyle = C.gold; const lw = 520 * eo(prog(t, 104.3, 104.7)); ctx.fillRect(W / 2 - lw / 2, 772, lw, 8);
+  text(ctx, 'VÍDEO COMPLETO NO CANAL', W / 2, 840, { size: 48, weight: 700, color: C.gold, ls: 4 });
+  // thumbnail
+  const tp = eback(prog(t, 104.5, 105.0));
+  if (tp > 0) {
+    ctx.save(); ctx.translate(W / 2, 1230); ctx.scale(tp, tp); ctx.rotate(-.02);
+    shadow(ctx, 50, 25, .5); ctx.fillStyle = '#E8D3A8'; rr(ctx, -420, -240, 840, 480, 30); ctx.fill(); noShadow(ctx);
+    ctx.save(); rr(ctx, -420, -240, 840, 480, 30); ctx.clip();
+    rays(ctx, -150, 30, 700, 18, t * .2, C.gold, .25);
+    coin(ctx, -170, 40, 150, { label: 'R$', crack: .6, seed: 4 }); tomb(ctx, 230, 210, .9, 'REAL ?', { color: '#9E978C' });
+    ctx.fillStyle = 'rgba(20,10,5,.75)'; ctx.fillRect(-420, -240, 840, 110);
+    text(ctx, 'O REAL ESTÁ MORRENDO', 0, -185, { size: 58, weight: 900, color: '#fff' });
+    ctx.restore(); ctx.restore();
+    // play button pulse
+    const pk = (1 + .08 * Math.sin(t * 8)) * pop(t, 105.0, .35);
+    ctx.save(); ctx.translate(W / 2, 1720); ctx.scale(pk, pk); ctx.fillStyle = C.red; rr(ctx, -340, -70, 680, 140, 70); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-270, -32); ctx.lineTo(-270, 32); ctx.lineTo(-215, 0); ctx.closePath(); ctx.fill();
+    text(ctx, 'ASSISTA AGORA', 35, 4, { size: 54, weight: 900, color: '#fff' }); ctx.restore();
+  }
+  ctx.fillStyle = `rgba(0,0,0,${prog(t, 106.4, 106.9)})`; ctx.fillRect(-200, -200, W + 400, H + 400);
+}, { noZoom: true });
+
 // ---------------- captions ----------------
 const words = JSON.parse(fs.readFileSync(process.env.WORDS, 'utf8'));
 const FIX = { 'validade': 'paridade', '120': 'R$ 5,20', 'gustava': 'que custava', 'Que': 'Por que', 'é.': 'é:' };
@@ -531,8 +571,9 @@ const chunks = []; { let cur = [];
   }); flush(); }
 chunks.forEach((c, i) => { c.s = c[0].s; const nx = chunks[i + 1]; c.e = Math.min(nx ? nx[0].s : 999, c[c.length - 1].s + 1.2); });
 function captions(ctx, t) {
+  if (t >= 103.95) return;
   const c = chunks.find(c => t >= c.s - .02 && t < c.e); if (!c) return;
-  const k = eback(prog(t, c.s - .02, c.s + .14)); const size = 82;
+  const k = c.s < .1 ? 1 : eback(prog(t, c.s - .02, c.s + .14)); const size = 82;
   const parts = c.map(w => ({ w: w.w.toUpperCase().replace(/[.,:]$/, '').replace('...', ''), key: KEY.has(clean(w.w).split(' ').pop()) || /\d/.test(w.w), act: t >= w.s }));
   L.font(ctx, size, 900); const sp = size * .28;
   const widths = parts.map(p => ctx.measureText(p.w).width); let tot = widths.reduce((a, b) => a + b, 0) + sp * (parts.length - 1);
