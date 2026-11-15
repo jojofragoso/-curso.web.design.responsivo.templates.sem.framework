@@ -1,1 +1,106 @@
-<h1>aaaaa</h1>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeShop — Loja Social</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- CABEÇALHO -->
+  <header class="topo">
+    <div class="container topo__conteudo">
+      <a href="#" class="logo">Vibe<span>Shop</span></a>
+
+      <form class="busca" role="search" onsubmit="return false">
+        <input type="search" id="busca" placeholder="Buscar produtos..." aria-label="Buscar produtos">
+        <button type="submit" aria-label="Buscar">🔍</button>
+      </form>
+
+      <nav class="topo__acoes">
+        <a href="#" class="topo__link">Entrar</a>
+        <button class="carrinho-btn" id="abrirCarrinho" aria-label="Abrir carrinho">
+          🛒 <span class="contador" id="contador">0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- CATEGORIAS -->
+    <section class="container categorias" aria-label="Categorias">
+      <button class="chip ativo" data-cat="todos">Todos</button>
+      <button class="chip" data-cat="moda">👗 Moda</button>
+      <button class="chip" data-cat="beleza">💄 Beleza</button>
+      <button class="chip" data-cat="tech">📱 Tech</button>
+      <button class="chip" data-cat="casa">🏠 Casa</button>
+      <button class="chip" data-cat="fitness">💪 Fitness</button>
+    </section>
+
+    <!-- DESTAQUE / HERO -->
+    <section class="container hero">
+      <div class="hero__texto">
+        <span class="selo">🔥 Em alta agora</span>
+        <h1>Descubra, assista e compre em segundos</h1>
+        <p>Produtos que viralizam nos vídeos dos criadores, com frete grátis acima de R$ 79.</p>
+        <a href="#produtos" class="btn btn--primario">Ver ofertas</a>
+      </div>
+      <div class="hero__videos">
+        <article class="video-card v1"><span class="ao-vivo">● AO VIVO</span><p>@lojadaana<br><small>12,4 mil assistindo</small></p></article>
+        <article class="video-card v2"><p>@techdobeto<br><small>Review fone sem fio</small></p></article>
+        <article class="video-card v3"><p>@casaarrumada<br><small>Organizadores</small></p></article>
+      </div>
+    </section>
+
+    <!-- OFERTA RELÂMPAGO -->
+    <section class="container relampago">
+      <h2>⚡ Oferta Relâmpago</h2>
+      <p>Termina em <strong id="cronometro">00:00:00</strong></p>
+    </section>
+
+    <!-- PRODUTOS -->
+    <section class="container" id="produtos">
+      <h2 class="titulo-secao">Para você</h2>
+      <div class="grade" id="grade"></div>
+    </section>
+  </main>
+
+  <!-- CARRINHO LATERAL -->
+  <aside class="carrinho" id="carrinho" aria-label="Carrinho">
+    <div class="carrinho__topo">
+      <h3>Seu carrinho</h3>
+      <button id="fecharCarrinho" aria-label="Fechar">✕</button>
+    </div>
+    <ul class="carrinho__lista" id="listaCarrinho"></ul>
+    <div class="carrinho__rodape">
+      <p>Total: <strong id="total">R$ 0,00</strong></p>
+      <button class="btn btn--primario btn--largo">Finalizar compra</button>
+    </div>
+  </aside>
+  <div class="sombra" id="sombra"></div>
+
+  <!-- RODAPÉ -->
+  <footer class="rodape">
+    <div class="container rodape__grade">
+      <div>
+        <a href="#" class="logo">Vibe<span>Shop</span></a>
+        <p>Template de estudo — web design responsivo sem framework.</p>
+      </div>
+      <div><h4>Ajuda</h4><a href="#">Trocas</a><a href="#">Entrega</a><a href="#">Pagamento</a></div>
+      <div><h4>Vender</h4><a href="#">Seja vendedor</a><a href="#">Seja criador</a></div>
+    </div>
+  </footer>
+
+  <!-- NAVEGAÇÃO INFERIOR (MOBILE) -->
+  <nav class="nav-mobile">
+    <a href="#" class="ativo">🏠<span>Início</span></a>
+    <a href="#produtos">🛍️<span>Loja</span></a>
+    <a href="#">▶️<span>Vídeos</span></a>
+    <a href="#" id="carrinhoMobile">🛒<span>Carrinho</span></a>
+    <a href="#">👤<span>Perfil</span></a>
+  </nav>
+
+  <script src="js/script.js"></script>
+</body>
+</html>
