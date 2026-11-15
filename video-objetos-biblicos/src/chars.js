@@ -18,6 +18,9 @@ function bust(ctx, x, y, s, o = {}) {
   ctx.beginPath(); ctx.moveTo(-300, 520); ctx.lineTo(-290, 300); ctx.quadraticCurveTo(-280, 200, -150, 180); ctx.lineTo(150, 180); ctx.quadraticCurveTo(280, 200, 290, 300); ctx.lineTo(300, 520); ctx.closePath(); ctx.fill(); noShadow(ctx);
   if (o.robe2) { ctx.fillStyle = o.robe2; ctx.beginPath(); ctx.moveTo(-70, 180); ctx.lineTo(0, 300); ctx.lineTo(70, 180); ctx.closePath(); ctx.fill(); }
   if (o.sash) { ctx.fillStyle = o.sash; ctx.beginPath(); ctx.moveTo(-230, 200); ctx.lineTo(-140, 185); ctx.lineTo(120, 520); ctx.lineTo(-20, 520); ctx.closePath(); ctx.fill(); }
+  if (o.suit) { ctx.fillStyle = '#F4F4F0'; ctx.beginPath(); ctx.moveTo(-80, 180); ctx.lineTo(0, 420); ctx.lineTo(80, 180); ctx.closePath(); ctx.fill();
+    if (o.tie) { ctx.fillStyle = o.tie; ctx.beginPath(); ctx.moveTo(-18, 195); ctx.lineTo(18, 195); ctx.lineTo(30, 380); ctx.lineTo(0, 420); ctx.lineTo(-30, 380); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.moveTo(-80, 180); ctx.lineTo(0, 430); ctx.lineTo(-40, 430); ctx.lineTo(-150, 200); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(80, 180); ctx.lineTo(0, 430); ctx.lineTo(40, 430); ctx.lineTo(150, 200); ctx.closePath(); ctx.fill(); }
   // neck
   ctx.fillStyle = skin2; rr(ctx, -45, 100, 90, 100, 20); ctx.fill();
   // ears
@@ -59,6 +62,8 @@ function bust(ctx, x, y, s, o = {}) {
     ctx.beginPath(); ctx.moveTo(-60, 88); ctx.quadraticCurveTo(0, 50, 60, 88); ctx.quadraticCurveTo(0, 74, -60, 88); ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.lineWidth = 4; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 30, 120); ctx.quadraticCurveTo(i * 26, len * .7, i * 12, len - 10); ctx.stroke(); }
   }
+  if (o.stubble) { ctx.fillStyle = o.stubble; ctx.beginPath(); ctx.moveTo(-100, 20); ctx.quadraticCurveTo(-90, 120, 0, 125); ctx.quadraticCurveTo(90, 120, 100, 20); ctx.quadraticCurveTo(60, 70, 0, 70); ctx.quadraticCurveTo(-60, 70, -100, 20); ctx.fill(); }
+  if (o.glasses) { ctx.strokeStyle = o.glasses; ctx.lineWidth = 6; ctx.beginPath(); ctx.roundRect(-78, -34, 66, 46, 12); ctx.roundRect(12, -34, 66, 46, 12); ctx.moveTo(-12, -16); ctx.lineTo(12, -16); ctx.moveTo(-78, -20); ctx.lineTo(-104, -24); ctx.moveTo(78, -20); ctx.lineTo(104, -24); ctx.stroke(); }
   // mouth
   const m = o.mouth || 'neutral', tk = o.talk || 0;
   ctx.strokeStyle = '#5A2A18'; ctx.lineWidth = 6; ctx.lineCap = 'round';
@@ -78,8 +83,12 @@ function fig(ctx, x, y, s, o = {}) {
   // legs
   ctx.strokeStyle = o.skin2 || SK.a2; ctx.lineWidth = 16; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(-14, -60); ctx.lineTo(-14 + sw * 22, 0); ctx.moveTo(14, -60); ctx.lineTo(14 - sw * 22, 0); ctx.stroke();
+  if (o.pants) { ctx.strokeStyle = o.pants; ctx.lineWidth = 24; ctx.beginPath(); ctx.moveTo(-14, -110); ctx.lineTo(-14 + sw * 24, -4); ctx.moveTo(14, -110); ctx.lineTo(14 - sw * 24, -4); ctx.stroke();
+    ctx.fillStyle = o.robe || C.blue; rr(ctx, -40, -215, 80, 120, 22); ctx.fill(); if (o.tie) { ctx.fillStyle = o.tie; ctx.beginPath(); ctx.moveTo(-6, -205); ctx.lineTo(6, -205); ctx.lineTo(9, -140); ctx.lineTo(0, -128); ctx.lineTo(-9, -140); ctx.closePath(); ctx.fill(); } }
+  else {
   // robe
   ctx.fillStyle = o.robe || C.brown; ctx.beginPath(); ctx.moveTo(-36, -210); ctx.quadraticCurveTo(-50, -100, -58, -40); ctx.lineTo(58, -40); ctx.quadraticCurveTo(50, -100, 36, -210); ctx.closePath(); ctx.fill();
+  }
   if (o.belt) { ctx.fillStyle = o.belt; ctx.fillRect(-46, -130, 92, 12); }
   // arms
   ctx.strokeStyle = o.robe || C.brown; ctx.lineWidth = 20;
@@ -105,6 +114,8 @@ function fig(ctx, x, y, s, o = {}) {
   ctx.fillStyle = '#2A1A10'; ctx.beginPath(); ctx.arc(-11, -252, 4.2, 0, 7); ctx.arc(13, -252, 4.2, 0, 7); ctx.fill();
   if (o.mouth === 'open') { ctx.beginPath(); ctx.ellipse(1, -230, 8, 9, 0, 0, 7); ctx.fill(); }
   else if (!o.beard) { ctx.strokeStyle = '#5A2A18'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(1, -238, 9, .3, Math.PI - .3); ctx.stroke(); }
+  if (o.phone) { ctx.save(); ctx.translate(34, -195); ctx.rotate(ra); ctx.fillStyle = '#222'; rr(ctx, -12, 86, 24, 40, 5); ctx.fill(); ctx.fillStyle = o.phone; ctx.fillRect(-9, 90, 18, 30); ctx.restore(); }
+  if (o.glasses) { ctx.strokeStyle = '#2A1A10'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-11, -252, 9, 0, 7); ctx.moveTo(22, -252); ctx.arc(13, -252, 9, 0, 7); ctx.stroke(); }
   if (o.pack) { ctx.fillStyle = o.pack; rr(ctx, -70, -200, 36, 90, 12); ctx.fill(); }
   ctx.restore();
 }
