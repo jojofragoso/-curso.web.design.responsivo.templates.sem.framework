@@ -1,0 +1,443 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Poppins;font-weight:600;src:url(node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:800;src:url(node_modules/@fontsource/poppins/files/poppins-latin-800-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:900;src:url(node_modules/@fontsource/poppins/files/poppins-latin-900-normal.woff2)}
+html,body{margin:0;background:#000}canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three';
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const out = document.getElementById('out'), o2 = out.getContext('2d');
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => cl((t - a) / (b - a));
+const eio = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const eo = (t) => 1 - Math.pow(1 - t, 3);
+const eback = (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+// ---------- toon materials + ink outline ----------
+const grad = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 1; const x = c.getContext('2d'); ['#6a6a6a', '#a8a8a8', '#e0e0e0', '#ffffff'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i, 0, 1, 1); }); const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.NearestFilter; return t; })();
+const mat = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...o });
+const INK = new THREE.MeshBasicMaterial({ color: 0x1b120c, side: THREE.BackSide });
+function ink(mesh, s = 1.04) { const m = new THREE.Mesh(mesh.geometry, INK); m.scale.setScalar(s); m.raycast = () => {}; mesh.add(m); return mesh; }
+function M(geo, c, o = {}) { const { ink: ik, inkS, ...mo } = o; const m = new THREE.Mesh(geo, c instanceof THREE.Material ? c : mat(c, mo)); m.castShadow = true; m.receiveShadow = true; if (ik !== false) ink(m, inkS || 1.04); return m; }
+const box = (w, h, d, c, o) => M(new THREE.BoxGeometry(w, h, d), c, o);
+const cyl = (r1, r2, h, c, o, seg = 20) => M(new THREE.CylinderGeometry(r1, r2, h, seg), c, o);
+const sph = (r, c, o) => M(new THREE.SphereGeometry(r, 24, 18), c, o);
+function texCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+const scene = new THREE.Scene();
+const hemi = new THREE.HemisphereLight(0xfff1d6, 0x6d5a3a, 1.3); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe7c0, 1.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); scene.add(sun, sun.target);
+const lampLight = new THREE.PointLight(0xffc477, 0, 14, 1.6); scene.add(lampLight);
+const phoneLight = new THREE.PointLight(0x7fb6ff, 0, 6, 1.5); scene.add(phoneLight);
+const candleLight = new THREE.PointLight(0xffa548, 0, 10, 1.6); scene.add(candleLight);
+const sirenLight = new THREE.PointLight(0xff3030, 0, 16, 1.2); scene.add(sirenLight);
+
+// ---------- faces ----------
+function drawFace(x, e, o) {
+  const S = 512; x.fillStyle = e === 'dead' ? '#cdd3d6' : o.skin; x.fillRect(0, 0, S, S);
+  const cx = 256, ey = 236, dx = 52, lk = o.look || 0;
+  if (e !== 'dead') { x.fillStyle = 'rgba(232,120,110,.28)'; x.beginPath(); x.arc(cx - 86, 300, 26, 0, 7); x.arc(cx + 86, 300, 26, 0, 7); x.fill(); }
+  x.strokeStyle = '#1b120c'; x.lineCap = 'round'; x.lineJoin = 'round';
+  const closed = e === 'sleep' || e === 'dead' || e === 'blink';
+  for (const s of [-1, 1]) {
+    const ex = cx + s * dx;
+    if (closed) { x.lineWidth = 9; x.beginPath(); x.arc(ex, ey - 6, 22, .25 * Math.PI, .75 * Math.PI); x.stroke(); if (o.lashes) { x.beginPath(); x.moveTo(ex + s * 22, ey + 8); x.lineTo(ex + s * 32, ey + 2); x.stroke(); } continue; }
+    const r = e === 'shock' ? 34 : 30;
+    x.fillStyle = '#fff'; x.beginPath(); x.ellipse(ex, ey, r * .82, r, 0, 0, 7); x.fill(); x.lineWidth = 7; x.stroke();
+    const pr = e === 'shock' ? 9 : 15; x.fillStyle = o.iris || '#6b3e1e'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr + 5, 0, 7); x.fill(); x.fillStyle = '#120a06'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr - 2, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(ex + lk * 9 - 5, ey - 3, 4, 0, 7); x.fill();
+    if (e === 'suspect' || e === 'tired') { x.fillStyle = o.skin; x.fillRect(ex - r, ey - r - 2, r * 2, r * (e === 'tired' ? .95 : .8)); x.lineWidth = 7; x.beginPath(); x.moveTo(ex - r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.lineTo(ex + r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.stroke(); }
+    if (o.lashes) { x.lineWidth = 6; x.beginPath(); x.moveTo(ex + s * r * .7, ey - r * .7); x.lineTo(ex + s * (r * .7 + 12), ey - r * .7 - 10); x.stroke(); }
+    if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.arc(ex, ey, r + 12, 0, 7); x.stroke(); x.strokeStyle = '#1b120c'; }
+  }
+  if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.moveTo(cx - 10, ey - 6); x.lineTo(cx + 10, ey - 6); x.stroke(); x.strokeStyle = '#1b120c'; }
+  // brows
+  x.lineWidth = 9; x.strokeStyle = o.brow || '#2a1a10';
+  const by = ey - (e === 'shock' ? 58 : 48);
+  for (const s of [-1, 1]) { const ex = cx + s * dx; let inner = 0, outer = 0;
+    if (e === 'sad' || e === 'worried' || e === 'cry' || e === 'plead') { inner = -12; outer = 6; }
+    if (e === 'angry') { inner = 10; outer = -6; }
+    if (e === 'suspect' && s > 0) { inner = -14; outer = -14; }
+    x.beginPath(); x.moveTo(ex - s * 4 - s * -24 * 0 + (s < 0 ? 20 : -20), by + inner); x.lineTo(ex + (s < 0 ? -22 : 22), by + outer); x.stroke(); }
+  // nose
+  x.lineWidth = 6; x.strokeStyle = 'rgba(90,40,20,.6)'; x.beginPath(); x.moveTo(cx - 4, 268); x.quadraticCurveTo(cx + 10, 290, cx - 6, 296); x.stroke();
+  if (o.mustache) { x.fillStyle = o.brow || '#2a1a10'; x.beginPath(); x.moveTo(cx - 52, 330); x.quadraticCurveTo(cx, 296, cx + 52, 330); x.quadraticCurveTo(cx, 318, cx - 52, 330); x.fill(); }
+  // mouth
+  x.strokeStyle = '#3a1a10'; x.lineWidth = 8; x.fillStyle = '#5a2418';
+  const my = 330;
+  if (e === 'smile' || e === 'happy') { x.beginPath(); x.moveTo(cx - 34, my - 6); x.quadraticCurveTo(cx, my + 26, cx + 34, my - 6); x.stroke(); }
+  else if (e === 'talk' || e === 'shock') { x.beginPath(); x.ellipse(cx, my + 4, e === 'shock' ? 16 : 18, e === 'shock' ? 22 : 12, 0, 0, 7); x.fill(); }
+  else if (e === 'sad' || e === 'cry') { x.beginPath(); x.moveTo(cx - 26, my + 10); x.quadraticCurveTo(cx, my - 8, cx + 26, my + 10); x.stroke(); }
+  else if (e === 'worried' || e === 'plead') { x.beginPath(); x.moveTo(cx - 28, my + 4); x.quadraticCurveTo(cx - 14, my - 6, cx, my + 4); x.quadraticCurveTo(cx + 14, my + 12, cx + 28, my + 2); x.stroke(); }
+  else if (e === 'sleep') { x.beginPath(); x.arc(cx, my, 8, 0, Math.PI); x.stroke(); }
+  else if (e === 'dead') { x.beginPath(); x.moveTo(cx - 18, my + 4); x.lineTo(cx + 18, my + 4); x.stroke(); }
+  else { x.beginPath(); x.moveTo(cx - 22, my + 2); x.lineTo(cx + 22, my + 2); x.stroke(); }
+  if (e === 'cry' || e === 'plead') { x.fillStyle = 'rgba(120,190,240,.85)'; for (const s of [-1, 1]) { x.beginPath(); x.ellipse(cx + s * dx + s * 6, ey + 58, 9, 22, 0, 0, 7); x.fill(); } }
+  if (e === 'sweat') {}
+}
+
+// ---------- characters ----------
+const CHARS = {};
+function makeChar(name, o) {
+  const G = new THREE.Group(); G.userData = { o, faces: {} };
+  const skinM = mat(o.skin);
+  // legs
+  const legs = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .2, .95, 0); const l = cyl(.15, .13, .9, o.pants, {}, 12); l.position.y = -.45; p.add(l); const sh = box(.3, .16, .42, 0x2a2420); sh.position.set(0, -.92, .06); p.add(sh); G.add(p); legs.push(p); }
+  // torso
+  const torsoGeo = new THREE.CapsuleGeometry(.46, .55, 8, 16); const torso = M(torsoGeo, o.shirt); torso.position.y = 1.42; torso.scale.set(1, 1, .82); G.add(torso);
+  if (o.collar) { const c = box(.5, .12, .1, o.collar, { ink: false }); c.position.set(0, 1.86, .36); G.add(c); }
+  // arms
+  const arms = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .54, 1.78, 0); const a = M(new THREE.CapsuleGeometry(.12, .52, 6, 10), o.shirt); a.position.y = -.38; p.add(a); const h = sph(.14, o.skin); h.position.y = -.76; p.add(h); p.rotation.z = s * .12; G.add(p); arms.push(p); }
+  // head
+  const hp = new THREE.Group(); hp.position.y = 2.42; G.add(hp);
+  const hg = new THREE.SphereGeometry(.56, 40, 30); hg.scale(1, 1.16, 1);
+  const head = new THREE.Mesh(hg, new THREE.MeshToonMaterial({ gradientMap: grad })); head.rotation.y = -Math.PI / 2; head.castShadow = true; ink(head, 1.035); hp.add(head);
+  for (const s of [-1, 1]) { const e = sph(.11, o.skin); e.scale.set(.6, 1, 1); e.position.set(s * .56, 0, 0); hp.add(e); }
+  // hair
+  const hc = o.hairCol;
+  if (o.hair === 'short' || o.hair === 'long' || o.hair === 'bun') { const capG = new THREE.SphereGeometry(.605, 32, 20, 0, Math.PI * 2, 0, Math.PI * .34); capG.scale(1, 1.16, 1); const cap = M(capG, hc); cap.rotation.x = -.22; hp.add(cap);
+    const bkG = new THREE.SphereGeometry(.6, 28, 18, Math.PI, Math.PI, 0, Math.PI * .66); bkG.scale(1.02, 1.17, 1.03); const back = M(bkG, hc, { ink: false }); hp.add(back); }
+  if (o.hair === 'long') { const lb = box(1.1, 1.05, .3, hc); lb.position.set(0, -.5, -.42); hp.add(lb); for (const sx of [-1, 1]) { const sd = box(.16, .95, .34, hc, { ink: false }); sd.position.set(sx * .6, -.38, -.22); hp.add(sd); }
+    const bang = box(.9, .16, .14, hc, { ink: false }); bang.position.set(0, .52, .42); bang.rotation.x = .5; hp.add(bang); }
+  if (o.hair === 'bun') { const b = sph(.26, hc); b.position.set(0, .62, -.3); hp.add(b); }
+  if (o.hair === 'bald') { for (const s of [-1, 1]) { const t = sph(.2, hc, { ink: false }); t.scale.set(.6, 1, 1.3); t.position.set(s * .5, .08, -.1); hp.add(t); } }
+  G.userData.parts = { legs, arms, hp, head, torso };
+  scene.add(G); CHARS[name] = G; return G;
+}
+function face(ch, e, look = 0) { const key = e + '|' + look; const f = ch.userData.faces; if (!f[key]) f[key] = texCanvas(512, 512, (x) => drawFace(x, e, { ...ch.userData.o, look })); const h = ch.userData.parts.head; if (h.material.map !== f[key]) { h.material.map = f[key]; h.material.needsUpdate = true; } }
+function pose(ch, p = {}) {
+  const { legs, arms, hp, torso } = ch.userData.parts; ch.visible = p.visible !== false;
+  ch.position.set(...(p.pos || [0, 0, 0])); ch.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0); ch.scale.setScalar(p.s || 1);
+  const w = p.walk; const sw = w != null ? Math.sin(w) * .55 : 0;
+  legs[0].rotation.x = sw; legs[1].rotation.x = -sw;
+  if (p.sit) { legs[0].rotation.x = legs[1].rotation.x = -1.45; }
+  arms[0].rotation.set(p.aL != null ? p.aL : -sw * .7, 0, -.12 - (p.aLz || 0)); arms[1].rotation.set(p.aR != null ? p.aR : sw * .7, 0, .12 + (p.aRz || 0));
+  hp.rotation.set(p.hx || 0, p.hy || 0, p.hz || 0); hp.position.y = 2.42 + (w != null ? Math.abs(Math.cos(w)) * .04 : 0) + (p.breath || 0);
+  face(ch, p.e || 'neutral', p.look || 0);
+}
+const ME = makeChar('me', { skin: '#E8B48C', hair: 'short', hairCol: 0x241812, shirt: 0x5a6470, pants: 0x2f3d5c, iris: '#4a2a14' });
+const KID = makeChar('kid', { skin: '#E8B48C', hair: 'short', hairCol: 0x241812, shirt: 0x6e7c8a, pants: 0x3a3a44, iris: '#4a2a14' });
+const BIA = makeChar('bia', { skin: '#F1C7A3', hair: 'long', hairCol: 0x15110f, shirt: 0x9b7fc4, pants: 0x6a4f8e, lashes: true, iris: '#3a2416' });
+const MOM = makeChar('mom', { skin: '#E3B08E', hair: 'bun', hairCol: 0xb9b4ac, shirt: 0x9c3b3b, pants: 0x4a3a34, glasses: true, lashes: true });
+const DAD = makeChar('dad', { skin: '#C98F67', hair: 'short', hairCol: 0x1e1410, shirt: 0x5d7a4e, pants: 0x3e3a30, mustache: true, brow: '#1e1410' });
+const EXTRA = []; const EXCOL = [[0xe08a3c, '#C98F67'], [0x4f9a6a, '#F1C7A3'], [0xc2574b, '#8E5A38'], [0x3f7fb3, '#E8B48C'], [0xd6b44a, '#C98F67'], [0x8a5aa8, '#F1C7A3'], [0x5a8a8a, '#8E5A38'], [0xb36f9a, '#E3B08E']];
+EXCOL.forEach(([sh, sk], i) => EXTRA.push(makeChar('x' + i, { skin: sk, hair: i % 3 === 2 ? 'bald' : (i % 2 ? 'long' : 'short'), hairCol: [0x241812, 0x6b4423, 0x3a2a20, 0x9a8a7a][i % 4], shirt: sh, pants: [0x2f3d5c, 0x3e3a30, 0x4a3a34][i % 3], lashes: i % 2 === 1, glasses: i === 6 || i === 7, mustache: i === 4 })));
+const ALL = [ME, KID, BIA, MOM, DAD, ...EXTRA];
+
+// ---------- props ----------
+function phoneMesh() { const g = new THREE.Group(); const b = box(.36, .7, .05, 0x1a1a1e); g.add(b); const scr = new THREE.Mesh(new THREE.PlaneGeometry(.32, .64), new THREE.MeshBasicMaterial({ color: 0x0b0d12 })); scr.position.z = .03; g.add(scr); g.userData.scr = scr; scene.add(g); return g; }
+const PHONE = phoneMesh(), PHONE2 = phoneMesh();
+function setPhone(ph, on) { ph.userData.scr.material.color.set(on ? 0x8fc4ff : 0x0b0d12); }
+const ROOMS = {};
+function room(name, ox, o) {
+  const G = new THREE.Group(); G.position.set(ox, 0, 0); scene.add(G); ROOMS[name] = G;
+  const fl = box(14, .2, 12, o.floor, { ink: false }); fl.position.y = -.1; G.add(fl);
+  const bw = box(14, 8, .2, o.wall, { ink: false }); bw.position.set(0, 4, -4); G.add(bw);
+  const sw = box(.2, 8, 12, o.wall2 || o.wall, { ink: false }); sw.position.set(-6, 4, 2); G.add(sw);
+  const sk = box(14, .3, .25, o.trim || 0xf3ead8, { ink: false }); sk.position.set(0, .15, -3.85); G.add(sk);
+  return G;
+}
+function frame(G, x, y, w, h, col) { const f = box(w, h, .08, 0x8a5a33); f.position.set(x, y, -3.85); G.add(f); const p = new THREE.Mesh(new THREE.PlaneGeometry(w * .8, h * .8), new THREE.MeshBasicMaterial({ map: texCanvas(128, 128, (x) => { x.fillStyle = '#9fc6d6'; x.fillRect(0, 0, 128, 128); x.fillStyle = '#7fae4e'; x.beginPath(); x.moveTo(0, 128); x.lineTo(50, 60); x.lineTo(90, 100); x.lineTo(128, 70); x.lineTo(128, 128); x.fill(); x.fillStyle = col; x.beginPath(); x.arc(96, 34, 14, 0, 7); x.fill(); }) })); p.position.set(x, y, -3.8); G.add(p); }
+function windowM(G, x, y, night) { const f = box(2.4, 2.6, .12, 0xf3ead8); f.position.set(x, y, -3.86); G.add(f); const gl = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.3), new THREE.MeshBasicMaterial({ color: 0xbfe0ef })); gl.position.set(x, y, -3.79); G.add(gl); G.userData.win = gl; const bar = box(.1, 2.3, .06, 0xf3ead8, { ink: false }); bar.position.set(x, y, -3.76); G.add(bar); const bar2 = box(2.1, .1, .06, 0xf3ead8, { ink: false }); bar2.position.set(x, y, -3.76); G.add(bar2); }
+// BEDROOM
+const BED = room('bed', 0, { floor: 0x8a6a4a, wall: 0x7d86b8, wall2: 0x6e78a8 });
+{ const G = BED; const fr = box(3.4, .5, 4.6, 0x9a5a3a); fr.position.set(0, .45, -1.4); G.add(fr); const hb = box(3.6, 2.0, .3, 0xa8653f); hb.position.set(0, 1.4, -3.6); G.add(hb);
+  const mt = box(3.2, .4, 4.3, 0xf2ece0); mt.position.set(0, .88, -1.4); G.add(mt);
+  for (const s of [-.8, .8]) { const p = box(1.2, .3, .7, 0xffffff); p.position.set(s, 1.2, -3.0); G.add(p); }
+  const bl = box(3.3, .62, 3.3, 0xd96b4a); bl.position.set(0, 1.36, -.75); G.add(bl); G.userData.blanket = bl;
+  for (const s of [-1, 1]) { const ns = box(1.0, 1.1, .9, 0x8a5a33); ns.position.set(s * 2.4, .55, -3.2); G.add(ns); }
+  const lb = cyl(.18, .25, .1, 0x3a3a44); lb.position.set(-2.4, 1.15, -3.2); G.add(lb); const ls = cyl(.04, .04, .7, 0x3a3a44, { ink: false }); ls.position.set(-2.4, 1.5, -3.2); G.add(ls); const sh = cyl(.3, .45, .45, 0xf0d9a8); sh.position.set(-2.4, 1.95, -3.2); G.add(sh); G.userData.shade = sh;
+  frame(G, 0, 5.0, 2.2, 1.4, '#f4d35e'); windowM(G, 4.4, 4.2);
+  const dr = box(2.2, 1.6, 1.0, 0x8a5a33); dr.position.set(-4.6, .8, -2.6); G.add(dr); const dw = box(1.9, .5, .1, 0x9e6a40); dw.position.set(-4.6, 1.05, -2.06); G.add(dw); G.userData.drawer = dw;
+}
+// alarm clock (analog)
+const CLOCK = new THREE.Group(); scene.add(CLOCK);
+{ const body = cyl(.32, .32, .2, 0xd8423a, {}, 28); body.rotation.x = Math.PI / 2; CLOCK.add(body); const fc = new THREE.Mesh(new THREE.CircleGeometry(.26, 28), mat(0xfbf6ea)); fc.position.z = .11; CLOCK.add(fc);
+  for (const s of [-1, 1]) { const b = sph(.12, 0xd8423a); b.position.set(s * .22, .3, 0); CLOCK.add(b); const leg = cyl(.03, .03, .16, 0x333333, { ink: false }); leg.position.set(s * .18, -.36, 0); CLOCK.add(leg); }
+  const hh = box(.035, .14, .02, 0x1b120c, { ink: false }); hh.geometry.translate(0, .07, 0); hh.position.z = .13; CLOCK.add(hh); const mh = box(.025, .21, .02, 0x1b120c, { ink: false }); mh.geometry.translate(0, .1, 0); mh.position.z = .14; CLOCK.add(mh); CLOCK.userData = { hh, mh }; }
+function setClock(h, m, ring, t) { CLOCK.userData.mh.rotation.z = -m / 60 * Math.PI * 2; CLOCK.userData.hh.rotation.z = -((h % 12) + m / 60) / 12 * Math.PI * 2; CLOCK.rotation.z = ring ? Math.sin(t * 60) * .08 : 0; }
+// ring box
+const RING = new THREE.Group(); scene.add(RING);
+{ const b = box(.5, .28, .5, 0xb8333a); RING.add(b); const lid = box(.5, .12, .5, 0xb8333a); lid.geometry.translate(0, .06, .25); lid.position.set(0, .14, -.25); RING.add(lid); RING.userData.lid = lid; const r = M(new THREE.TorusGeometry(.1, .025, 10, 24), 0xf2c14e); r.position.set(0, .26, 0); RING.add(r); const gem = sph(.05, 0xdff6ff); gem.position.set(0, .37, 0); RING.add(gem); }
+// LIVING ROOM (+ door)
+const LIV = room('liv', 60, { floor: 0xa47a52, wall: 0xb9d3b0, wall2: 0xa8c4a0 });
+{ const G = LIV; const base = box(4.4, .7, 1.6, 0xd9714e); base.position.set(-1, .55, -2.8); G.add(base); const back = box(4.4, 1.3, .45, 0xd9714e); back.position.set(-1, 1.4, -3.45); G.add(back); for (const s of [-1, 1]) { const arm = box(.45, 1.0, 1.6, 0xc8603f); arm.position.set(-1 + s * 2.25, .9, -2.8); G.add(arm); }
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(2.6, 40), mat(0xd27a5a)); rug.rotation.x = -Math.PI / 2; rug.position.set(-.5, .02, -.4); rug.receiveShadow = true; G.add(rug);
+  frame(G, -2.6, 4.6, 1.6, 1.2, '#e86a5a'); frame(G, .2, 4.8, 1.2, 1.4, '#f4d35e');
+  const door = box(2.0, 4.2, .25, 0x7a4a2a); door.position.set(3.6, 2.1, -3.8); G.add(door); const knob = sph(.1, 0xf2c14e); knob.position.set(2.9, 2.0, -3.6); G.add(knob);
+  const tbl = box(1.0, 1.0, .6, 0x8a5a33); tbl.position.set(5.4, .5, -3.4); G.add(tbl); const bowl = cyl(.35, .2, .2, 0xc0392b); bowl.position.set(5.4, 1.12, -3.4); G.add(bowl);
+  const keys = new THREE.Group(); const kr = M(new THREE.TorusGeometry(.08, .02, 8, 16), 0xd0d0d0); keys.add(kr); const k1 = box(.04, .2, .02, 0xf2c14e); k1.position.y = -.14; keys.add(k1); keys.position.set(5.4, 1.25, -3.4); G.add(keys); G.userData.keys = keys; }
+// DINING
+const DIN = room('din', 120, { floor: 0x7a5a42, wall: 0x8f86b8, wall2: 0x7d74a6 });
+{ const G = DIN; const tb = box(4.2, .2, 2.0, 0xe6dcc8); tb.position.set(0, 1.5, -1.5); G.add(tb); for (const x of [-1.8, 1.8]) for (const z of [-2.3, -.7]) { const l = box(.15, 1.5, .15, 0x6a4a2e, { ink: false }); l.position.set(x, .75, z); G.add(l); }
+  for (const s of [-1, 1]) { const pl = cyl(.4, .3, .06, 0xffffff); pl.position.set(s * 1.1, 1.64, -1.5); G.add(pl); const fd = sph(.15, 0x9a6a3a, { ink: false }); fd.scale.y = .4; fd.position.set(s * 1.1, 1.7, -1.5); G.add(fd); const gl = cyl(.1, .08, .35, 0xcfe8f2); gl.position.set(s * 1.4, 1.78, -2.1); G.add(gl); }
+  for (const s of [-.3, .3]) { const c = cyl(.06, .06, .5, 0xfff4e0); c.position.set(s, 1.85, -1.8); G.add(c); const fl = sph(.06, 0xffc44a, { ink: false }); fl.scale.y = 1.6; fl.position.set(s, 2.18, -1.8); fl.material.emissive = new THREE.Color(0xffa020); G.add(fl); }
+  const lampS = cyl(.6, 1.1, .7, 0xe8c16a); lampS.position.set(0, 6.2, -1.5); G.add(lampS); frame(G, -3.4, 4.6, 1.4, 1.2, '#e86a5a'); }
+// STREET
+const STR = room('str', 180, { floor: 0x9a9a9a, wall: 0xd9a86a, wall2: 0xc9985a });
+{ const G = STR; const road = box(30, .1, 5, 0x55565c, { ink: false }); road.position.set(0, .01, 3.5); G.add(road); for (let i = 0; i < 8; i++) { const z = box(.5, .02, 3.6, 0xf3f3f3, { ink: false }); z.position.set(-3 + i * .9, .07, 3.5); G.add(z); }
+  const cols = [0xd96b4a, 0xe6b75a, 0x6aa6b8, 0xb98ac9, 0x8ab86a, 0xe08a6a];
+  for (let i = 0; i < 7; i++) { const h = 6 + (i % 3) * 2.5; const b = box(3.6, h, 1.5, cols[i % 6]); b.position.set(-11 + i * 3.7, h / 2, -4.6); G.add(b); for (let r = 0; r < Math.floor(h / 2) - 1; r++) for (const c of [-1, 0, 1]) { const w = box(.6, .8, .05, 0x2b3a4a, { ink: false }); w.position.set(-11 + i * 3.7 + c * 1.1, 1.6 + r * 2, -3.82); G.add(w); } }
+  for (const x of [-6, 5]) { const tr = cyl(.15, .2, 2.2, 0x6b4423); tr.position.set(x, 1.1, -2.6); G.add(tr); const cr = sph(1.1, 0x5f9a4a); cr.position.set(x, 2.8, -2.6); G.add(cr); }
+  const pole = cyl(.08, .08, 3.4, 0x2a2a2a); pole.position.set(2.2, 1.7, .6); G.add(pole); const tl = box(.45, 1.1, .4, 0x2a2a2a); tl.position.set(2.2, 3.6, .6); G.add(tl); for (let k = 0; k < 3; k++) { const l = sph(.12, [0xd8423a, 0xe6b75a, 0x4fb36a][k], { ink: false }); l.position.set(2.2, 3.95 - k * .33, .82); G.add(l); } }
+// PARK
+const PARK = room('park', 240, { floor: 0x8ab86a, wall: 0xa9d3e3, wall2: 0xa9d3e3 });
+{ const G = PARK; const seat = box(3.2, .15, .9, 0x9a6a3a); seat.position.set(0, 1.0, -2.2); G.add(seat); const bk = box(3.2, .8, .12, 0x9a6a3a); bk.position.set(0, 1.6, -2.7); G.add(bk); for (const s of [-1.4, 1.4]) { const l = box(.12, 1.0, .8, 0x3a3a3a, { ink: false }); l.position.set(s, .5, -2.2); G.add(l); }
+  for (const x of [-4.5, 4.5]) { const tr = cyl(.2, .25, 2.4, 0x6b4423); tr.position.set(x, 1.2, -3); G.add(tr); const cr = sph(1.4, 0x5f9a4a); cr.position.set(x, 3.2, -3); G.add(cr); }
+  const cat = new THREE.Group(); const cb = sph(.3, 0x1b1b1b); cb.scale.set(1.4, .9, .8); cat.add(cb); const ch = sph(.22, 0x1b1b1b); ch.position.set(.4, .25, 0); cat.add(ch); for (const s of [-.1, .1]) { const e = M(new THREE.ConeGeometry(.08, .16, 4), 0x1b1b1b, { ink: false }); e.position.set(.42, .48, s); cat.add(e); } const tl = cyl(.04, .04, .7, 0x1b1b1b, { ink: false }); tl.position.set(-.5, .3, 0); tl.rotation.z = .6; cat.add(tl); cat.position.set(3, .32, .5); G.add(cat); G.userData.cat = cat; }
+// MOM'S HOUSE
+const MOMH = room('momh', 300, { floor: 0x9a7a5a, wall: 0xe0a86a, wall2: 0xd09858 });
+{ const G = MOMH; windowM(G, 2.6, 4.2); frame(G, -2.4, 4.6, 1.4, 1.1, '#e86a5a'); const ch = box(1.8, 1.0, 1.6, 0x9c3b3b); ch.position.set(-3.6, .5, -2.6); G.add(ch); const cb = box(1.8, 1.5, .4, 0x9c3b3b); cb.position.set(-3.6, 1.6, -3.2); G.add(cb); }
+// VOID (dark backdrop for close-ups / overlays)
+const VOID = room('void', 360, { floor: 0x1a1d2e, wall: 0x232842, wall2: 0x232842 });
+
+// ---------- overlays (2D on top of render) ----------
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function T(s, X, Y, size, col, o = {}) { o2.font = `${o.w || 800} ${size}px Poppins`; o2.textAlign = o.a || 'center'; o2.textBaseline = 'middle'; if (o.stroke) { o2.lineJoin = 'round'; o2.lineWidth = o.stroke; o2.strokeStyle = o.sc || '#1b120c'; o2.strokeText(s, X, Y); } o2.fillStyle = col; o2.fillText(s, X, Y); }
+function phoneUI(X, Y, s, o = {}) { // big phone lockscreen
+  o2.save(); o2.translate(X, Y); o2.rotate(o.rot || 0); o2.scale(s, s);
+  o2.shadowColor = 'rgba(0,0,0,.5)'; o2.shadowBlur = 50; o2.shadowOffsetY = 20; o2.fillStyle = '#16181c'; rr(o2, -260, -520, 520, 1040, 70); o2.fill(); o2.shadowColor = 'transparent';
+  const g = o2.createLinearGradient(0, -500, 0, 500); g.addColorStop(0, o.bg1 || '#2a2f6a'); g.addColorStop(1, o.bg2 || '#141633'); o2.fillStyle = g; rr(o2, -238, -496, 476, 992, 54); o2.fill();
+  o2.fillStyle = '#000'; rr(o2, -70, -480, 140, 34, 17); o2.fill();
+  if (o.time) { T(o.time, 0, -330, 130, '#fff', { w: 600 }); T(o.date || '', 0, -235, 34, 'rgba(255,255,255,.8)', { w: 600 }); }
+  if (o.notif) { const k = eback(cl(o.notif)); o2.save(); o2.translate((o.swipe || 0) * 400, -60); o2.scale(k, k); o2.fillStyle = 'rgba(255,255,255,.92)'; rr(o2, -210, -70, 420, 140, 28); o2.fill(); o2.fillStyle = '#1b120c'; rr(o2, -185, -45, 50, 50, 12); o2.fill(); T('!', -160, -20, 34, '#fff'); T('AVISO · agora', -120, -38, 24, '#555', { a: 'left', w: 600 }); T('Despeça-se.', -120, 12, 42, '#111', { a: 'left', w: 800 }); o2.restore(); }
+  if (o.empty) T('Sem notificações', 0, -40, 34, 'rgba(255,255,255,.7)', { w: 600 });
+  if (o.off) { o2.fillStyle = `rgba(0,0,0,${o.off})`; rr(o2, -238, -496, 476, 992, 54); o2.fill(); }
+  o2.restore();
+}
+function pillTag(s, X, Y, k, col = '#fff', bg = '#d8423a') { if (k <= 0) return; const kk = eback(cl(k)); o2.save(); o2.translate(X, Y); o2.scale(kk, kk); o2.rotate(-.04); o2.font = '900 64px Poppins'; const w = o2.measureText(s).width + 70; o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 20; o2.shadowOffsetY = 8; o2.fillStyle = bg; rr(o2, -w / 2, -52, w, 104, 22); o2.fill(); o2.shadowColor = 'transparent'; T(s, 0, 4, 64, col, { w: 900 }); o2.restore(); }
+function calendarUI(X, Y, s, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)) * s; o2.scale(kk, kk); o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 30; o2.shadowOffsetY = 14; o2.fillStyle = '#fffaf0'; rr(o2, -330, -330, 660, 660, 30); o2.fill(); o2.shadowColor = 'transparent'; o2.fillStyle = '#d8423a'; rr(o2, -330, -330, 660, 120, 30); o2.fill(); o2.fillRect(-330, -250, 660, 40); T('DIAS', 0, -270, 58, '#fff', { w: 900 });
+  for (let i = 0; i < 28; i++) { const cx = -250 + (i % 7) * 83, cy = -150 + Math.floor(i / 7) * 95; T('' + (i + 1), cx, cy, 34, '#3a2a20', { w: 700 }); if (i < 12 && k > .5) { o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.beginPath(); o2.moveTo(cx - 20, cy - 20); o2.lineTo(cx + 20, cy + 20); o2.moveTo(cx + 20, cy - 20); o2.lineTo(cx - 20, cy + 20); o2.stroke(); } if (i === 22) { o2.fillStyle = '#d8423a'; o2.beginPath(); o2.arc(cx, cy, 36, 0, 7); o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.stroke(); } }
+  o2.restore(); }
+function newspaperUI(X, Y, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); o2.rotate(lerp(3, -.05, eo(cl(k)))); const s = lerp(.1, 1, eo(cl(k))); o2.scale(s, s); o2.shadowColor = 'rgba(0,0,0,.4)'; o2.shadowBlur = 40; o2.shadowOffsetY = 18; o2.fillStyle = '#f5efe2'; o2.fillRect(-330, -420, 660, 840); o2.shadowColor = 'transparent'; T('O DIÁRIO', 0, -350, 54, '#1b120c', { w: 900 }); o2.fillStyle = '#1b120c'; o2.fillRect(-290, -310, 580, 5); T('AVISO', 0, -220, 110, '#1b120c', { w: 900 }); T('FALHOU?', 0, -110, 110, '#1b120c', { w: 900 }); o2.fillStyle = '#8a8a8a'; rr(o2, -280, -30, 250, 330, 10); o2.fill(); o2.fillStyle = '#2a2a2a'; rr(o2, -210, 40, 110, 190, 14); o2.fill(); o2.fillStyle = 'rgba(27,18,12,.35)'; for (let i = 0; i < 10; i++) o2.fillRect(10, -20 + i * 34, 270 - (i % 3) * 40, 14); o2.restore(); }
+function contactsUI(X, Y, k, t) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.fillStyle = '#16181c'; rr(o2, -230, -400, 460, 800, 50); o2.fill(); o2.fillStyle = '#20243a'; rr(o2, -212, -380, 424, 760, 36); o2.fill(); T('CONTATOS', 0, -320, 36, '#fff', { w: 800 }); ['Mãe', 'Bia', 'Chefe', 'Tio Zé', 'Ana', 'Rafa', 'Vó Lia'].forEach((n, i) => { const y = -230 + i * 90; o2.fillStyle = 'rgba(255,255,255,.12)'; o2.beginPath(); o2.arc(-150, y, 28, 0, 7); o2.fill(); T(n, -100, y, 34, '#fff', { a: 'left', w: 600 }); const on = (t * 2.5) % 7 > i; o2.fillStyle = on ? '#3fbf6a' : 'rgba(255,255,255,.2)'; o2.beginPath(); o2.arc(150, y, 26, 0, 7); o2.fill(); }); o2.restore(); }
+function bigClock(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); o2.font = '900 150px Poppins'; const sz = Math.min(150, 150 * 960 / o2.measureText(s).width); T(s, X, Y, sz, col, { w: 900, stroke: 18, sc: '#1b120c' }); o2.restore(); }
+
+// ---------- camera, moods ----------
+const camera = new THREE.PerspectiveCamera(40, W / H, .1, 300);
+function mood(m, t) {
+  const night = m === 'night' || m === 'dark' || m === 'nightlamp';
+  hemi.intensity = m === 'dark' ? .55 : night ? .8 : 1.3; hemi.color.set(night ? 0x8a9ad8 : 0xfff1d6); hemi.groundColor.set(night ? 0x2a2a44 : 0x6d5a3a);
+  sun.intensity = night ? .25 : 1.6; sun.color.set(night ? 0x8aa0ff : 0xffe7c0);
+  scene.background = new THREE.Color(night ? 0x141833 : 0xe9dcbc);
+  lampLight.intensity = 0; phoneLight.intensity = 0; candleLight.intensity = 0; sirenLight.intensity = 0;
+}
+function place(G, lx, ly, lz) { return [G.position.x + lx, ly, G.position.z + lz]; }
+function cam(G, p, l, fov = 40) { camera.position.set(...place(G, ...p)); camera.lookAt(...place(G, ...l)); camera.fov = fov; camera.updateProjectionMatrix(); sun.position.set(G.position.x + 6, 14, 10); sun.target.position.set(G.position.x, 0, -1); }
+const L3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+const talk = (t) => (Math.floor(t * 9) % 2 ? 'talk' : 'neutral');
+const blinkE = (t, e = 'neutral', seed = 0) => (((t + seed) % 3.1) < .12 ? 'blink' : e);
+function hideAll() { ALL.forEach(c => c.visible = false); PHONE.visible = PHONE2.visible = false; CLOCK.visible = false; RING.visible = false; }
+const inBed = (G, ch, x, e, o = {}) => pose(ch, { pos: place(G, x, 1.3, -.55 + (o.dz || 0)), rx: -Math.PI / 2, e, hy: o.hy || 0, aL: o.aL || 0, aR: o.aR || 0, look: o.look || 0 });
+
+// ---------- shots ----------
+const SH = [];
+const shot = (t0, fn) => SH.push({ t0, fn });
+// 0 HOOK: street, crowd, everyone on phones; one phone lights up
+shot(0, (t, lt) => { mood('day'); const G = STR;
+  EXTRA.forEach((c, i) => { const x = -6 + i * 1.6 + ((t * .8 + i * .37) % 1) * 0; const walk = i % 2 ? t * 6 + i : null; pose(c, { pos: place(G, x + (walk != null ? (t * .9 % 3) - 1.5 : 0), 0, -1.6 + (i % 3) * .9), ry: walk != null ? Math.PI / 2 : 0, walk, aR: -1.3, e: blinkE(t, 'neutral', i), look: 0, hx: .35 }); });
+  pose(ME, { pos: place(G, 0, 0, 1.4), aR: -1.35, hx: .4, e: t > 2.9 ? 'shock' : blinkE(t), look: 0 });
+  PHONE.visible = true; PHONE.position.set(...place(G, .3, 1.9, 2.15)); PHONE.rotation.set(-.9, 0, 0); setPhone(PHONE, t > 2.88); phoneLight.intensity = t > 2.88 ? 4 : 0; phoneLight.position.set(...place(G, .2, 2.4, 2.6));
+  const k = eio(prog(t, 0, 3.9)); cam(G, L3([0, 9, 16], [0, 3.1, 5.2], k), L3([0, 2, -1], [0, 2.4, 1.4], k), 40);
+  if (t < 2.9) { o2.globalAlpha = 1; } });
+shot(4.0, (t) => { mood('day'); const G = STR; EXTRA.forEach((c, i) => pose(c, { pos: place(G, -6 + i * 1.6, 0, -2.4), aR: -1.3, hx: .35, e: 'neutral' }));
+  pose(ME, { pos: place(G, 0, 0, 1.4), aR: t > 5 ? -.1 : -1.35, aL: t > 5 ? -2.4 : 0, aLz: t > 5 ? -.3 : 0, hy: Math.sin(t * 3) * .3, e: t > 5 ? 'worried' : 'shock', look: Math.sin(t * 3) });
+  cam(G, [0, 2.9, 4.6], [0, 2.4, 1.4], 36); });
+// 2 notification any hour (overlay phone)
+shot(6.0, (t, lt) => { mood('night'); const G = BED; inBed(G, ME, -.7, 'sleep'); cam(G, [0, 6, 6], [0, 1, -2], 40);
+  const times = [['03:12', 'domingo'], ['14:40', 'terça-feira'], ['08:05', 'sábado']]; const idx = Math.min(2, Math.floor(prog(t, 6.0, 7.9) * 3));
+  SH.ov = () => { o2.fillStyle = 'rgba(10,12,30,.55)'; o2.fillRect(0, 0, W, H); phoneUI(W / 2, 880, .95, { time: t < 7.9 ? times[idx][0] : '09:20', date: t < 7.9 ? times[idx][1] : 'segunda-feira', notif: prog(t, 8.96, 9.3) }); }; });
+// 3 can't pay, can't turn off, never wrong
+shot(10.1, (t) => { mood('night'); cam(BED, [0, 6, 6], [0, 1, -2], 40); inBed(BED, ME, -.7, 'sleep');
+  SH.ov = () => { o2.fillStyle = 'rgba(10,12,30,.55)'; o2.fillRect(0, 0, W, H); const sw = t < 11.2 ? Math.sin(prog(t, 10.3, 11.1) * Math.PI) * .6 : 0; phoneUI(W / 2, 880, .95, { time: '09:20', date: 'segunda-feira', notif: 1, swipe: sw }); // finger
+    if (t < 11.2) { const fx = W / 2 + sw * 380, fy = 840; o2.fillStyle = '#E8B48C'; o2.strokeStyle = '#1b120c'; o2.lineWidth = 6; rr(o2, fx - 32, fy, 64, 420, 32); o2.fill(); o2.stroke(); }
+    else if (t < 12.26) { const p = Math.abs(Math.sin(t * 9)); o2.fillStyle = '#E8B48C'; o2.strokeStyle = '#1b120c'; o2.lineWidth = 6; rr(o2, W / 2 + 250 - p * 20, 520, 200, 64, 32); o2.fill(); o2.stroke(); }
+    else pillTag('NUNCA ERRA', W / 2, 380, prog(t, 12.66, 12.98)); }; });
+// 4 you can tell by how they act — nervous walker among people
+shot(13.38, (t) => { mood('day'); const G = STR; EXTRA.forEach((c, i) => { const x = -7 + ((i * 2.1 + (t - 13) * 1.4) % 15); pose(c, { pos: place(G, x, 0, -2 + (i % 3) * .8), ry: Math.PI / 2, walk: t * 6 + i, e: 'neutral' }); });
+  const x = -2 + (t - 13.38) * .8; pose(ME, { pos: place(G, x, 0, 1.2), ry: Math.PI / 2 - .4 + Math.sin(t * 4) * .5, walk: t * 7, hy: Math.sin(t * 5) * .6, e: 'worried', look: Math.sin(t * 5) });
+  cam(G, [x + 1, 3, 7], [x, 2, 0], 42); });
+// 5 calls everyone, apologizes
+shot(15.62, (t) => { mood('day'); const G = LIV; pose(ME, { pos: place(G, -1.2, 0, -.3), aR: -2.6, aRz: -.4, hz: .12, e: t > 17.06 ? 'sad' : talk(t) }); PHONE.visible = true; PHONE.position.set(...place(G, -.85, 2.55, -.15)); PHONE.rotation.set(0, -.6, .3); setPhone(PHONE, true);
+  cam(G, [-.2, 2.6, 5.5], [-.4, 2.0, -.3], 38); SH.ov = () => contactsUI(820, 760, prog(t, 15.8, 16.2), t - 16); });
+// 6 pays what he owes, doesn't say why
+shot(17.94, (t) => { mood('day'); const G = LIV; const hand = prog(t, 18.1, 18.6); pose(ME, { pos: place(G, -1.6, 0, -.6), ry: .7, aR: -1.5 * hand, e: t > 19 ? 'neutral' : 'worried' }); pose(EXTRA[4], { pos: place(G, 1.2, 0, -.6), ry: -.7, aL: -1.2 * hand, e: t > 19.14 ? 'suspect' : 'neutral', look: -1 });
+  cam(G, [-.2, 2.7, 6], [-.2, 1.9, -.6], 38); SH.ov = () => { if (t > 18.3 && t < 19.5) { o2.save(); o2.translate(W / 2, 1040); o2.rotate(-.1); o2.fillStyle = '#f3ead8'; o2.strokeStyle = '#1b120c'; o2.lineWidth = 6; rr(o2, -90, -55, 180, 110, 10); o2.fill(); o2.stroke(); T('R$', 0, 2, 50, '#2e7d4f', { w: 900 }); o2.restore(); } if (t > 19.4) { T('🤐', W / 2, 0, 1, 'transparent'); pillTag('SEM MOTIVO', W / 2, 400, prog(t, 19.54, 19.8)); } }; });
+// 7 elders say telling brings bad luck
+shot(20.85, (t) => { mood('day'); const G = PARK; pose(EXTRA[2], { pos: place(G, -.7, .35, -2.1), sit: true, e: talk(t), aL: -.6 }); pose(EXTRA[7], { pos: place(G, .7, .35, -2.1), sit: true, e: 'worried', look: -1 });
+  G.userData.cat.position.x = lerp(4, -4, prog(t, 20.9, 23.1)); G.userData.cat.rotation.y = Math.PI; cam(G, [0, 2.4, 5.4], [0, 1.6, -2], 40); SH.ov = () => pillTag('CONTAR DÁ AZAR', W / 2, 400, prog(t, 21.89, 22.2)); });
+// 8 dad died asleep when I was 8
+shot(23.09, (t) => { mood('night'); const G = BED; inBed(G, DAD, 0, 'sleep'); cam(G, [2.6, 4.6, -.8], [0, 1.3, -2.9], 34); lampLight.intensity = 0; SH.ov = () => { o2.globalAlpha = .7 + .3 * Math.sin(t * 2); T('z', 640, 640 - ((t * 60) % 120), 70, '#fff', { w: 900 }); T('z', 700, 560 - ((t * 60 + 40) % 120), 50, '#fff', { w: 900 }); o2.globalAlpha = 1; pillTag('8 ANOS', W / 2, 380, prog(t, 24.21, 24.5), '#fff', '#3a4a7a'); }; });
+// 9 his phone never warned
+shot(25.73, (t) => { mood('night'); const G = BED; inBed(G, DAD, 0, 'sleep'); PHONE.visible = true; PHONE.position.set(...place(G, 2.4, 1.13, -3.1)); PHONE.rotation.set(-Math.PI / 2, 0, 0); setPhone(PHONE, false);
+  cam(G, [1.6, 3.2, -.6], [2.2, 1.1, -3.1], 38); SH.ov = () => pillTag('NUNCA AVISOU', W / 2, 400, prog(t, 26.77, 27.1)); });
+// 10 they said it was a glitch — newspaper
+shot(27.73, (t) => { mood('day'); cam(LIV, [0, 3, 6], [0, 2, -2], 40); SH.ov = () => { o2.fillStyle = 'rgba(30,20,10,.35)'; o2.fillRect(0, 0, W, H); newspaperUI(W / 2, 860, prog(t, 27.8, 28.4)); }; });
+// 11 mom never spoke of that night, made me promise
+shot(29.89, (t) => { mood('nightlamp'); const G = LIV; lampLight.intensity = 3; lampLight.position.set(...place(G, -3, 4, 0)); pose(MOM, { pos: place(G, 1.4, 0, -1.2), ry: -.5, e: t > 33.09 ? talk(t) : 'sad', look: -1 }); pose(KID, { pos: place(G, -1.2, .1, -2.6), sit: true, s: .72, e: 'worried', look: 1, ry: .3 });
+  cam(G, [0, 2.6, 6.2], [0, 1.6, -1.6], 40); SH.ov = () => pillTag('PROMETE?', W / 2, 400, prog(t, 32.13, 32.5), '#fff', '#3a4a7a'); });
+// 12 mom close-up: "don't tell anyone, not even me"
+shot(33.9, (t) => { mood('nightlamp'); const G = LIV; lampLight.intensity = 3; lampLight.position.set(...place(G, -2, 4, 2)); pose(MOM, { pos: place(G, 0, 0, -1), e: blinkE(t, t < 36.8 ? talk(t) : 'worried'), hz: Math.sin(t) * .04 });
+  cam(G, [0, 2.4, 2.4], [0, 2.3, -1], 38); });
+// 13 today I'm 26
+shot(37.02, (t) => { mood('day'); const G = LIV; pose(ME, { pos: place(G, -.4, 0, -.4), aR: -1.3, e: blinkE(t, 'neutral') }); cam(G, [0, 2.5, 6], [-.3, 1.8, -.4], 38); SH.ov = () => pillTag('26 ANOS', W / 2, 400, prog(t, 37.66, 38.0), '#fff', '#3a4a7a'); });
+// 14 live with Bia for 3 years
+shot(38.7, (t) => { mood('day'); const G = LIV; pose(ME, { pos: place(G, -1.8, .1, -2.6), sit: true, e: 'smile' }); pose(BIA, { pos: place(G, -.2, .1, -2.6), sit: true, e: 'happy', hz: .15, aL: -1.0 }); cam(G, [-1, 2.5, 4.8], [-1, 1.8, -2.6], 40);
+  SH.ov = () => { pillTag('3 ANOS', W / 2, 400, prog(t, 39.9, 40.2)); for (let i = 0; i < 5; i++) { const p = ((t * .6 + i / 5) % 1); o2.globalAlpha = 1 - p; T('♥', 300 + i * 120, 1000 - p * 300, 70, '#e0443a', { w: 900 }); } o2.globalAlpha = 1; }; });
+// 15 she never accepts "it's nothing"
+shot(40.62, (t) => { mood('day'); const G = LIV; pose(BIA, { pos: place(G, .6, 0, -.6), ry: -.4, e: 'suspect', look: -1, aL: -.4 }); pose(ME, { pos: place(G, -1.2, 0, -.6), ry: .4, e: t > 41.8 ? 'smile' : 'neutral', aL: t > 41.8 ? -.6 : 0, aR: t > 41.8 ? -.6 : 0, aLz: .6, aRz: .6 });
+  cam(G, [-.3, 2.6, 5.4], [-.3, 2.0, -.6], 38); SH.ov = () => { if (t > 41.8) { o2.save(); o2.translate(380, 760); o2.fillStyle = '#fff'; rr(o2, -150, -50, 300, 100, 50); o2.fill(); T('Não é nada.', 0, 2, 34, '#1b120c', { w: 800 }); o2.restore(); } }; });
+// 16 she sleeps early, in socks, hugging my arm
+shot(42.94, (t) => { mood('nightlamp'); const G = BED; lampLight.intensity = 2.4; lampLight.position.set(...place(G, -2.4, 2.2, -3)); inBed(G, ME, -.7, 'neutral', { look: 1 }); inBed(G, BIA, .7, 'sleep', { hy: -.3, aR: -1.2 }); cam(G, [.4, 6.4, 1.2], [0, 1.3, -2.4], 36);
+  SH.ov = () => pillTag('DE MEIA', W / 2, 400, prog(t, 43.9, 44.2), '#fff', '#3a4a7a'); });
+// 17 analog alarm clock rings at 6:30
+shot(45.8, (t) => { mood('day'); const G = BED; CLOCK.visible = true; CLOCK.position.set(...place(G, 2.4, 1.45, -3.0)); const m = lerp(0, 30, eio(prog(t, 46.2, 47.8))); setClock(6, m, false, t);
+  cam(G, [2.4, 1.6, -1.6], [2.4, 1.42, -3], 30); SH.ov = () => pillTag('6:30', W / 2, 400, prog(t, 47.8, 48.1)); });
+// 18 she turns it off on the first ring so I don't wake
+shot(48.68, (t) => { mood('day'); const G = BED; CLOCK.visible = true; CLOCK.position.set(...place(G, 2.4, 1.45, -3.0)); const off = t > 49.6; setClock(6, 30, !off, t); inBed(G, BIA, .7, off ? 'sleep' : 'tired', { aR: off ? -.2 : -2.2 }); inBed(G, ME, -.7, 'sleep');
+  cam(G, [2.4, 5.2, .4], [1.4, 1.3, -2.8], 38); SH.ov = () => { if (!off) { T('TRIM', 860, 520, 64, '#fff', { w: 900, stroke: 12 }); } }; });
+// 19 was going to propose on her birthday — ring box
+shot(51.48, (t) => { mood('day'); const G = BED; RING.visible = true; RING.position.set(...place(G, -4.6, 1.75, -2.6)); RING.userData.lid.rotation.x = -eio(prog(t, 51.9, 52.6)) * 1.9; RING.rotation.y = .4;
+  cam(G, [-4.2, 2.6, -1.2], [-4.6, 1.8, -2.6], 30); SH.ov = () => { for (let i = 0; i < 8; i++) { const a = i / 8 * 7 + t; const r = 120 + ((t * 80 + i * 30) % 120); o2.fillStyle = `rgba(255,240,180,${.8 * prog(t, 52.4, 52.8)})`; o2.beginPath(); o2.arc(W / 2 + Math.cos(a) * r, 900 + Math.sin(a) * r, 7, 0, 7); o2.fill(); } pillTag('ANIVERSÁRIO DELA', W / 2, 400, prog(t, 53.08, 53.4)); }; });
+// 20 11 days left — calendar overlay
+shot(54.12, (t) => { mood('day'); cam(BED, [0, 4, 6], [0, 2, -2], 40); SH.ov = () => { o2.fillStyle = 'rgba(30,20,10,.4)'; o2.fillRect(0, 0, W, H); calendarUI(W / 2, 880, 1.1, prog(t, 54.15, 54.6)); pillTag('FALTAVAM 11 DIAS', W / 2, 1280, prog(t, 54.84, 55.2)); }; });
+// 21 Thursday 11pm my phone lit up
+shot(55.72, (t) => { mood('dark'); const G = BED; inBed(G, ME, -.7, t > 58.6 ? 'shock' : 'tired', { hy: t > 58.6 ? .5 : 0 }); inBed(G, BIA, .7, 'sleep', { hy: -.3, aR: -1.2 }); PHONE.visible = true; PHONE.position.set(...place(G, -2.4, 1.13, -3.0)); PHONE.rotation.set(-Math.PI / 2, 0, 0); setPhone(PHONE, t > 58.68);
+  phoneLight.intensity = t > 58.68 ? 6 : 0; phoneLight.position.set(...place(G, -2.2, 1.8, -3)); cam(G, [-1.4, 6.0, .8], [-.9, 1.3, -2.7], 36); SH.ov = () => pillTag('QUINTA · 23:00', W / 2, 400, prog(t, 56.04, 56.4), '#fff', '#3a4a7a'); });
+// 22 "Despeça-se."
+shot(59.4, (t) => { mood('dark'); cam(VOID, [0, 3, 6], [0, 2, -2], 40); SH.ov = () => { phoneUI(W / 2, 900, 1.0, { time: '23:00', date: 'quinta-feira', notif: prog(t, 59.45, 59.8), bg1: '#2a1030', bg2: '#0e0610' }); }; });
+// 23 until 11pm Friday — 24 hours (close face + countdown)
+shot(60.44, (t) => { mood('dark'); const G = BED; phoneLight.intensity = 5; phoneLight.position.set(...place(G, -.6, 1.9, -1.9)); inBed(G, ME, -.7, 'shock', { hy: 0 }); cam(G, [-.7, 3.3, -2.6], [-.7, 1.4, -2.9], 34);
+  SH.ov = () => { const left = Math.max(0, 24 * 3600 - Math.floor((t - 62.68) * 3600 * 4)); const h = String(Math.floor(left / 3600)).padStart(2, '0'), m = String(Math.floor(left / 60) % 60).padStart(2, '0'), s = String(left % 60).padStart(2, '0'); bigClock(t < 62.68 ? 'ATÉ SEXTA 23:00' : `${h}:${m}:${s}`, W / 2, 400, prog(t, 60.6, 60.9), t < 62.68 ? '#fff' : '#ff5a4d'); }; });
+// 24 told no one, turned off the light, pretended to sleep
+shot(63.72, (t) => { const on = t < 64.9; mood(on ? 'nightlamp' : 'dark'); const G = BED; lampLight.intensity = on ? 2.4 : 0; lampLight.position.set(...place(G, -2.4, 2.2, -3)); inBed(G, ME, -.7, t > 65.6 ? 'neutral' : 'worried', { look: 1, aL: on ? -2.2 : 0 }); inBed(G, BIA, .7, 'sleep', { hy: -.3, aR: -1.2 });
+  cam(G, [0, 6.4, 1.2], [0, 1.3, -2.5], 36); SH.ov = () => { if (!on && t > 65.6) { o2.fillStyle = 'rgba(0,0,0,.25)'; o2.fillRect(0, 0, W, H); } }; });
+// 25 Friday: said goodbye to everyone without saying goodbye
+shot(66.68, (t) => { mood('day'); const G = STR; [EXTRA[0], EXTRA[3], EXTRA[1]].forEach((c, i) => pose(c, { pos: place(G, -2 + i * 2, 0, -.6), e: i === 1 ? 'smile' : 'neutral', aL: i === 0 && t > 67.6 ? -1.2 : 0 })); pose(ME, { pos: place(G, 0, 0, .8), ry: Math.PI - .2, aL: -1.1, aR: -1.1, aLz: .4, aRz: .4, e: 'sad' });
+  cam(G, [0, 2.8, 6.4], [0, 2, -.4], 40); SH.ov = () => pillTag('SEXTA', W / 2, 400, prog(t, 66.84, 67.2)); });
+// 26 paid rent in advance
+shot(69.5, (t) => { mood('day'); const G = LIV; pose(ME, { pos: place(G, -1.0, 0, -.6), ry: .7, aR: -1.4, e: 'neutral' }); pose(EXTRA[6], { pos: place(G, 1.0, 0, -.6), ry: -.7, aL: -1.2, e: 'smile' });
+  cam(G, [0, 2.6, 5.4], [0, 1.9, -.6], 38); SH.ov = () => { o2.save(); o2.translate(W / 2, 1040); o2.rotate(-.1); o2.fillStyle = '#f3ead8'; o2.strokeStyle = '#1b120c'; o2.lineWidth = 6; rr(o2, -110, -60, 220, 120, 10); o2.fill(); o2.stroke(); T('ALUGUEL', 0, 2, 34, '#2e7d4f', { w: 900 }); o2.restore(); }; });
+// 27 left the ring in her drawer
+shot(71.18, (t) => { mood('day'); const G = BED; const op = eio(prog(t, 71.2, 71.7)) * (1 - eio(prog(t, 72.2, 72.7))); G.userData.drawer.position.z = -2.06 + op * .7; RING.visible = true; RING.position.set(...place(G, -4.6, lerp(1.9, 1.15, prog(t, 71.5, 72.1)), -2.06 + op * .7 - .1)); RING.userData.lid.rotation.x = 0;
+  cam(G, [-4.2, 2.8, -.4], [-4.6, 1.2, -2.2], 34); });
+// 28 called mom to hear her voice
+shot(72.78, (t) => { mood('day'); const G = BED; BED.userData.drawer.position.z = -2.06; pose(ME, { pos: place(G, 1.0, 0, .4), aR: -2.6, aRz: -.4, hz: .12, e: blinkE(t, 'sad') }); PHONE.visible = true; PHONE.position.set(...place(G, 1.35, 2.55, .55)); PHONE.rotation.set(0, -.6, .3); setPhone(PHONE, true);
+  cam(G, [1.4, 2.5, 4.4], [1.0, 2.1, .4], 38); });
+// 29 mom silent... "it came, didn't it?" — I said no — she didn't insist
+shot(75.02, (t) => { mood('day'); const G = MOMH; pose(MOM, { pos: place(G, 0, 0, -1.2), aR: -2.6, aRz: -.4, hz: .1, e: t > 77.26 && t < 77.9 ? talk(t) : (t > 79.2 ? 'cry' : 'worried') }); PHONE.visible = true; PHONE.position.set(...place(G, .35, 2.55, -1.05)); PHONE.rotation.set(0, -.6, .3); setPhone(PHONE, true);
+  const k = eio(prog(t, 75.1, 80.3)); cam(G, L3([0, 2.6, 5.4], [.1, 2.5, 1.6], k), [0, 2.25, -1.2], 38);
+  SH.ov = () => { if (t > 77.2 && t < 78.9) { o2.save(); o2.translate(W / 2, 560); o2.fillStyle = '#fff'; rr(o2, -200, -60, 400, 120, 60); o2.fill(); T('Chegou, né?', 0, 2, 46, '#1b120c', { w: 800 }); o2.restore(); } }; });
+// 30 dinner: couldn't stop looking at Bia; she noticed
+shot(80.46, (t) => { mood('nightlamp'); const G = DIN; candleLight.intensity = 3 + Math.sin(t * 17) * .4; candleLight.position.set(...place(G, 0, 2.6, -1.4)); pose(ME, { pos: place(G, -1.2, .2, -.1), sit: true, e: 'sad', look: 1, hy: .3 }); pose(BIA, { pos: place(G, 1.2, .2, -.1), sit: true, e: t > 83.24 ? 'suspect' : 'neutral', look: t > 83.24 ? -1 : 0, hy: t > 83.24 ? -.3 : 0 });
+  [ME, BIA].forEach(c => c.position.z = place(G, 0, 0, -2.9)[2]); ME.rotation.y = .5; BIA.rotation.y = -.5; ME.position.x = place(G, -1.25, 0, 0)[0]; BIA.position.x = place(G, 1.25, 0, 0)[0];
+  const k = eio(prog(t, 80.5, 85.3)); cam(G, L3([0, 3.4, 4.6], [0, 3.0, 2.6], k), [0, 2.4, -2.4], 40); });
+// 31 "you're saying goodbye to me" — I said no — she didn't believe
+shot(85.4, (t) => { mood('nightlamp'); const G = DIN; candleLight.intensity = 3 + Math.sin(t * 17) * .4; candleLight.position.set(...place(G, 0, 2.6, -1.4)); const bia = t < 87.8 || t > 88.76;
+  pose(BIA, { pos: place(G, 1.25, .2, -2.9), ry: -.5, sit: true, e: t < 87.4 ? talk(t) : (t > 88.76 ? 'sad' : 'suspect'), look: -1 }); pose(ME, { pos: place(G, -1.25, .2, -2.9), ry: .5, sit: true, e: t > 87.8 && t < 88.4 ? talk(t) : 'worried', look: 1 });
+  if (bia) cam(G, [.1, 2.9, -.4], [1.25, 2.5, -2.9], 34); else cam(G, [-.1, 2.9, -.4], [-1.25, 2.5, -2.9], 34); });
+// 32 at 10, took car keys to leave; didn't want her to see me die
+shot(89.88, (t) => { mood('nightlamp'); const G = LIV; lampLight.intensity = 2.5; lampLight.position.set(...place(G, 2, 4, 0)); const k = G.userData.keys; const grab = prog(t, 90.7, 91.3); k.position.set(...[5.4, lerp(1.25, 1.9, grab), -3.4]); k.visible = grab < .95;
+  pose(ME, { pos: place(G, 4.6, 0, -2.2), ry: .6, aR: -1.4 * Math.min(1, grab * 1.4), e: 'sad', look: 1 }); cam(G, [3.6, 2.6, 1.6], [5.0, 1.6, -3.1], 38); SH.ov = () => pillTag('22:00', W / 2, 400, prog(t, 90.12, 90.4), '#fff', '#3a4a7a'); });
+// 33 she stood in front of the door: "I'm coming with you." held my face
+shot(94.28, (t) => { mood('nightlamp'); const G = LIV; lampLight.intensity = 2.5; lampLight.position.set(...place(G, 2, 4, 0)); G.userData.keys.visible = false; const hold = t > 97.2;
+  pose(BIA, { pos: place(G, 3.6, 0, -2.6), ry: .3, e: t > 96.35 && t < 97.0 ? talk(t) : 'plead', aL: hold ? -1.9 : 0, aR: hold ? -1.9 : 0, aLz: hold ? -.35 : 0, aRz: hold ? -.35 : 0 }); pose(ME, { pos: place(G, 2.9, 0, -1.3), ry: Math.PI + .5, e: 'cry' });
+  cam(G, [5.9, 2.7, -.2], [3.2, 2.2, -2.0], 40); });
+// 34 "tell me. I want to stay until the end." — promised mom — I swear I tried
+shot(98.83, (t) => { mood('nightlamp'); const G = LIV; lampLight.intensity = 2.5; lampLight.position.set(...place(G, 2, 4, 0)); const her = t < 100.91;
+  pose(BIA, { pos: place(G, 3.6, 0, -2.6), ry: .3, e: her ? (Math.floor(t * 9) % 2 ? 'plead' : 'cry') : 'plead', aL: -1.9, aR: -1.9, aLz: -.35, aRz: -.35 }); pose(ME, { pos: place(G, 2.9, 0, -1.3), ry: Math.PI + .5, e: 'cry', hz: Math.sin(t * 2) * .05 });
+  if (her) cam(G, [4.7, 2.6, .5], [3.6, 2.4, -2.6], 36); else cam(G, [1.7, 2.55, -3.5], [2.9, 2.4, -1.3], 36); });
+// 35 40 minutes left, I told her; she hugged me and turned off the light
+shot(103.63, (t) => { const off = t > 108.0; mood(off ? 'dark' : 'nightlamp'); const G = BED; lampLight.intensity = off ? 0 : 2.4; lampLight.position.set(...place(G, -2.4, 2.2, -3)); pose(ME, { pos: place(G, -.4, .1, .6), ry: .6, e: t < 105.6 ? talk(t) : 'cry', aL: -1.2, aR: -1.2, aLz: .4, aRz: .4 }); pose(BIA, { pos: place(G, .5, .1, .9), ry: -2.4, e: 'sad', aL: -1.3, aR: -1.3, aLz: -.4, aRz: -.4 });
+  cam(G, [-.2, 2.6, 4.8], [0, 2, .6], 38); SH.ov = () => pillTag('FALTAM 40 MIN', W / 2, 400, prog(t, 104.11, 104.5), '#fff', '#3a4a7a'); });
+// 36 "sleep. I'll stay awake counting for you." 10:50, 10:55
+shot(108.59, (t) => { mood('dark'); const G = BED; lampLight.intensity = 0; hemi.intensity = .45; inBed(G, ME, -.7, t > 112 ? 'tired' : 'neutral', { look: 1 }); inBed(G, BIA, .7, blinkE(t, t < 112 ? talk(t) : 'neutral'), { hy: -.4, look: -1, aR: -1.0 }); cam(G, [0, 5.8, .6], [0, 1.3, -2.6], 34);
+  SH.ov = () => { if (t > 112.33) bigClock(t < 113.45 ? '22:50' : '22:55', W / 2, 400, prog(t, 112.33, 112.6)); }; });
+// 37 her hand squeezing mine; I don't remember closing my eyes
+shot(114.89, (t) => { mood('dark'); const G = VOID; hemi.intensity = .9; lampLight.intensity = 3; lampLight.position.set(...place(G, 0, 3, 1)); const k = prog(t, 116.5, 118.2);
+  const hand = (x, col, rot) => { const g = new THREE.Group(); return g; };
+  pose(ME, { pos: place(G, -.45, 0, -1), ry: .4, aR: -1.0, aRz: -.3, e: k > .5 ? 'sleep' : 'tired' }); pose(BIA, { pos: place(G, .45, 0, -1), ry: -.4, aL: -1.0, aLz: .3, e: 'neutral' });
+  cam(G, [0, 2.3, 3.6], [0, 1.9, -1], 40); SH.ov = () => { o2.fillStyle = `rgba(0,0,0,${eio(k)})`; o2.fillRect(0, 0, W, H); }; });
+// 38 woke up with the alarm. 6:30. I was alive.
+shot(118.33, (t) => { mood('day'); const G = BED; CLOCK.visible = true; CLOCK.position.set(...place(G, 2.4, 1.45, -3.0)); setClock(6, 30, true, t); inBed(G, ME, -.7, t > 120.89 ? 'shock' : 'tired', { hy: .2 }); inBed(G, BIA, .7, 'dead', { hy: -.3, aR: -1.2 });
+  if (t < 119.85) cam(G, [2.4, 1.7, -1.6], [2.4, 1.45, -3], 30); else cam(G, [-.7, 3.3, -2.0], [-.7, 1.4, -2.9], 34); SH.ov = () => { if (t < 119.85) T('TRIM TRIM', W / 2, 520, 70, '#fff', { w: 900, stroke: 12 }); if (t > 120.89) pillTag('VIVO', W / 2, 400, prog(t, 121.0, 121.3), '#fff', '#2e7d4f'); }; });
+// 39 the alarm kept ringing until it stopped by itself
+shot(121.93, (t) => { mood('day'); const G = BED; CLOCK.visible = true; CLOCK.position.set(...place(G, 2.4, 1.45, -3.0)); const ring = t < 124.7; setClock(6, 30 + (t - 121.9) * 1.5, ring, t); inBed(G, BIA, .7, 'dead', { hy: -.3, aR: -1.2 }); inBed(G, ME, -.7, 'worried', { hy: .5, look: 1 });
+  cam(G, [2.6, 5.6, .8], [1.2, 1.3, -2.6], 38); SH.ov = () => { if (ring && Math.sin(t * 20) > 0) T('TRIM', 860, 520, 64, '#fff', { w: 900, stroke: 12 }); }; });
+// 40 Bia hugging my arm. Cold.
+shot(125.29, (t) => { mood('day'); const G = BED; hemi.color.set(0xc8d8f0); inBed(G, BIA, .7, 'dead', { hy: -.3, aR: -1.2 }); inBed(G, ME, -.7, t > 127.6 ? 'cry' : 'shock', { hy: .6, look: 1 });
+  const k = eio(prog(t, 125.3, 128.2)); cam(G, L3([.7, 5.8, .6], [.7, 3.6, -2.1], k), [.7, 1.3, -2.9], 36); SH.ov = () => { if (t > 127.66) { o2.fillStyle = 'rgba(120,170,230,.18)'; o2.fillRect(0, 0, W, H); pillTag('FRIA', W / 2, 400, prog(t, 127.66, 127.95), '#fff', '#3a6a9a'); } }; });
+// 41 my notification vanished; hers never came
+shot(128.22, (t) => { mood('day'); cam(BED, [0, 4, 6], [0, 2, -2], 40); SH.ov = () => { o2.fillStyle = 'rgba(20,20,30,.55)'; o2.fillRect(0, 0, W, H); phoneUI(300, 880, .55, { time: '06:31', date: 'meu celular', empty: true, bg1: '#2a2f6a', bg2: '#141633' }); if (t > 130.38) phoneUI(780, 880, .55, { time: '06:31', date: 'celular dela', empty: true, bg1: '#6a2a4a', bg2: '#331420' }); }; });
+// 42 telling doesn't bring bad luck. telling passes death to who listens.
+shot(132.14, (t) => { mood('dark'); const G = VOID; pose(ME, { pos: place(G, -1.3, 0, -1), ry: .5, e: 'worried', look: 1 }); pose(BIA, { pos: place(G, 1.3, 0, -1), ry: -.5, e: t > 134.4 ? 'dead' : 'neutral', look: -1 });
+  cam(G, [0, 2.4, 6], [0, 1.9, -1], 38); SH.ov = () => { pillTag('NÃO DÁ AZAR', W / 2, 400, prog(t, 132.6, 132.9) * (1 - prog(t, 133.5, 133.6)), '#fff', '#3a4a7a'); pillTag('PASSA A MORTE', W / 2, 400, prog(t, 134.14, 134.45));
+    const p = prog(t, 133.7, 135.3); if (p > 0 && p < 1) { for (let i = 0; i < 14; i++) { const q = cl(p * 1.4 - i * .03); const x = lerp(370, 710, q), y = 880 - Math.sin(q * Math.PI) * 220; o2.fillStyle = `rgba(20,0,0,${.7})`; o2.beginPath(); o2.arc(x + Math.sin(t * 9 + i) * 8, y + Math.cos(t * 7 + i) * 8, 16 - i * .6, 0, 7); o2.fill(); } } }; });
+// 43 mom, before the ambulance, looked at Bia and asked nothing
+shot(135.66, (t) => { mood('day'); const G = BED; hemi.color.set(0xc8d8f0); sirenLight.intensity = 5; sirenLight.color.set(Math.floor(t * 3) % 2 ? 0xff3030 : 0x3060ff); sirenLight.position.set(...place(G, 4.4, 4, -2.5)); inBed(G, BIA, .7, 'dead', { hy: -.3 });
+  pose(MOM, { pos: place(G, -1.2, 0, .9), ry: .5, e: 'sad', look: 1 }); cam(G, [1.4, 3.4, 5.6], [-.5, 1.8, -1.0], 40); });
+// 44 hugged me and whispered: "I also told your father."
+shot(139.5, (t) => { mood('dark'); const G = VOID; hemi.intensity = .55; pose(MOM, { pos: place(G, .35, 0, -1), ry: -2.6, aL: -1.3, aR: -1.3, aLz: -.4, aRz: -.4, e: t > 141.2 ? talk(t) : 'cry' }); pose(ME, { pos: place(G, -.3, 0, -.4), ry: .5, e: 'cry' });
+  if (t < 141.0) cam(G, [0, 2.5, 4.4], [0, 2.1, -.7], 38); else cam(G, [-1.2, 2.5, -3.6], [.35, 2.35, -1], 38); SH.ov = () => { if (t > 142.5) { o2.fillStyle = `rgba(0,0,0,${prog(t, 142.6, 143.3)})`; o2.fillRect(0, 0, W, H); } }; });
+
+// ---------- captions ----------
+let WORDS = [];
+const KEY = new Set(['24', 'horas', 'morrer', 'celular', 'ninguém', 'notificação', 'despeça-se!', 'despeça-se.', 'pagar', 'desligar', 'nunca', 'erra.', 'liga', 'desculpa.', 'deve,', 'motivo.', 'azar.', 'pai', 'morreu', '8', 'dormindo.', 'falha.', 'mãe', 'prometer', 'chegar,', 'mim.', '26', 'bia', '3', 'nada.', 'meia,', 'despertador', 'seis', 'casamento', 'aniversário', '11', 'quinta-feira,', 'acendeu.', 'sexta.', 'contei', 'adeus.', 'aluguel', 'anel', 'silêncio.', 'chegou,', 'jantar,', 'percebeu.', 'despedindo', 'chave', 'carro', 'morrer.', 'porta', 'junto.', 'conta.', 'fim.', 'tentei.', '40', 'contei.', 'luz.', 'dorme.', '50.', '55.', 'mão', 'olhos.', 'vivo.', 'tocando.', 'sozinho.', 'braço.', 'fria.', 'sumido.', 'nenhum.', 'contar', 'morte', 'escuta.', 'ambulância.', 'baixinho.', 'pai.']);
+let CH = [];
+function buildChunks() { let cur = []; const flush = () => { if (cur.length) CH.push(cur); cur = []; };
+  WORDS.forEach(w => { const txt = cur.map(x => x.w).join(' '); if (cur.length && (cur.length >= 3 || (txt + ' ' + w.w).length > 18 || w.s - cur[cur.length - 1].s > .9)) flush(); cur.push(w); if (/[.,!?:]$/.test(w.w)) flush(); }); flush();
+  CH.forEach((c, i) => { c.s = c[0].s; const nx = CH[i + 1]; c.e = Math.min(nx ? nx[0].s : 143, c[c.length - 1].s + 1.2); }); }
+function captions(t) {
+  if (t >= 143) return; const c = CH.find(c => t >= c.s - .02 && t < c.e); if (!c) return;
+  const k = c.s < .1 ? 1 : eback(prog(t, c.s - .02, c.s + .14)); const size = 80;
+  o2.font = `900 ${size}px Poppins`; const parts = c.map(w => ({ w: w.w.toUpperCase().replace(/[.,]$/, ''), key: KEY.has(w.w.toLowerCase()) }));
+  const sp = size * .28; const ws = parts.map(p => o2.measureText(p.w).width); const tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); const sc = Math.min(1, 960 / tot);
+  o2.save(); o2.translate(W / 2, 1400); o2.scale(k * sc, k * sc); let x = -tot / 2;
+  parts.forEach((p, i) => { const cx = x + ws[i] / 2; o2.save(); o2.shadowColor = 'rgba(0,0,0,.55)'; o2.shadowBlur = 18; o2.shadowOffsetY = 8; T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900, stroke: 16, sc: '#1b120c' }); o2.restore(); T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900 }); x += ws[i] + sp; });
+  o2.restore();
+}
+// ---------- end card ----------
+function endCard(t) {
+  const lt = t - 143; o2.fillStyle = '#1a120b'; o2.fillRect(0, 0, W, H);
+  o2.save(); o2.translate(W / 2, 520); const k = eback(cl(lt / .5)); o2.scale(k, k);
+  for (const [dx, a] of [[-70, 1], [70, .55]]) { o2.globalAlpha = a; o2.fillStyle = '#2E6E8E'; o2.beginPath(); o2.arc(dx, 0, 120, 0, 7); o2.fill(); o2.strokeStyle = '#F2C14E'; o2.lineWidth = 10; o2.stroke(); o2.lineWidth = 5; o2.beginPath(); o2.ellipse(dx, 0, 50, 120, 0, 0, 7); o2.moveTo(dx - 120, 0); o2.lineTo(dx + 120, 0); o2.stroke(); }
+  o2.restore(); o2.globalAlpha = 1;
+  T('MUNDO PARALELO', W / 2, 760, 104 * eback(cl((lt - .15) / .4)), '#fff', { w: 900 });
+  o2.fillStyle = '#F2C14E'; const lw = 520 * eo(cl((lt - .35) / .4)); o2.fillRect(W / 2 - lw / 2, 832, lw, 8);
+  T('E VOCÊ, CONTARIA?', W / 2, 910, 52, '#F2C14E', { w: 800 });
+  const pk = (1 + .08 * Math.sin(t * 8)) * eback(cl((lt - .8) / .35)); o2.save(); o2.translate(W / 2, 1500); o2.scale(pk, pk); o2.fillStyle = '#C0392B'; rr(o2, -340, -70, 680, 140, 70); o2.fill(); o2.fillStyle = '#fff'; o2.beginPath(); o2.moveTo(-270, -32); o2.lineTo(-270, 32); o2.lineTo(-215, 0); o2.closePath(); o2.fill(); T('SIGA O CANAL', 35, 4, 54, '#fff', { w: 900 }); o2.restore();
+  o2.fillStyle = `rgba(0,0,0,${cl((t - 146.9) / .5)})`; o2.fillRect(0, 0, W, H);
+}
+// ---------- grain ----------
+const grainC = document.createElement('canvas'); grainC.width = 540; grainC.height = 960; const gx = grainC.getContext('2d'); const gid = gx.createImageData(540, 960);
+function grain(seed) { let s = (seed * 9301 + 49297) % 233280; for (let i = 0; i < gid.data.length; i += 4) { s = (s * 9301 + 49297) % 233280; const v = s / 233280 * 255; gid.data[i] = gid.data[i + 1] = gid.data[i + 2] = v; gid.data[i + 3] = 20; } gx.putImageData(gid, 0, 0); }
+
+window.renderFrame = (t) => {
+  if (t >= 143) { endCard(t); return out.toDataURL('image/jpeg', .9); }
+  hideAll(); SH.ov = null; BED.userData.drawer.position.z = -2.06; LIV.userData.keys.visible = true; LIV.userData.keys.position.set(5.4, 1.25, -3.4);
+  const s = SH.filter(s => t >= s.t0).pop(); s.fn(t, t - s.t0);
+  renderer.render(scene, camera);
+  o2.globalAlpha = 1; o2.filter = 'sepia(.18) saturate(1.05) contrast(1.03)'; o2.drawImage(renderer.domElement, 0, 0); o2.filter = 'none';
+  if (SH.ov) { o2.save(); SH.ov(); o2.restore(); }
+  const v = o2.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, H * .78); v.addColorStop(0, 'rgba(30,15,5,0)'); v.addColorStop(1, 'rgba(30,15,5,.42)'); o2.fillStyle = v; o2.fillRect(0, 0, W, H);
+  grain(Math.floor(t * 30)); o2.drawImage(grainC, 0, 0, W, H);
+  const lt = t - s.t0; if (lt < .1 && s.t0 > 0) { o2.fillStyle = `rgba(255,248,230,${.25 * (1 - lt / .1)})`; o2.fillRect(0, 0, W, H); }
+  captions(t);
+  return out.toDataURL('image/jpeg', .9);
+};
+window.setWords = (w) => { WORDS = w; CH = []; buildChunks(); };
+await document.fonts.load('900 80px Poppins'); await document.fonts.load('800 40px Poppins'); await document.fonts.load('600 40px Poppins');
+window.ready = true;
+</script></body></html>
