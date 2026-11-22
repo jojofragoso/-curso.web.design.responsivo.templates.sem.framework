@@ -1,0 +1,395 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Poppins;font-weight:600;src:url(node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:800;src:url(node_modules/@fontsource/poppins/files/poppins-latin-800-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:900;src:url(node_modules/@fontsource/poppins/files/poppins-latin-900-normal.woff2)}
+html,body{margin:0;background:#000}canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three';
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const out = document.getElementById('out'), o2 = out.getContext('2d');
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => cl((t - a) / (b - a));
+const eio = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const eo = (t) => 1 - Math.pow(1 - t, 3);
+const eback = (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+// ---------- toon materials + ink outline ----------
+const grad = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 1; const x = c.getContext('2d'); ['#6a6a6a', '#a8a8a8', '#e0e0e0', '#ffffff'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i, 0, 1, 1); }); const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.NearestFilter; return t; })();
+const mat = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...o });
+const INK = new THREE.MeshBasicMaterial({ color: 0x1b120c, side: THREE.BackSide });
+function ink(mesh, s = 1.04) { const m = new THREE.Mesh(mesh.geometry, INK); m.scale.setScalar(s); m.raycast = () => {}; mesh.add(m); return mesh; }
+function M(geo, c, o = {}) { const { ink: ik, inkS, ...mo } = o; const m = new THREE.Mesh(geo, c instanceof THREE.Material ? c : mat(c, mo)); m.castShadow = true; m.receiveShadow = true; if (ik !== false) ink(m, inkS || 1.04); return m; }
+const box = (w, h, d, c, o) => M(new THREE.BoxGeometry(w, h, d), c, o);
+const cyl = (r1, r2, h, c, o, seg = 20) => M(new THREE.CylinderGeometry(r1, r2, h, seg), c, o);
+const sph = (r, c, o) => M(new THREE.SphereGeometry(r, 24, 18), c, o);
+function texCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+const scene = new THREE.Scene();
+const hemi = new THREE.HemisphereLight(0xfff1d6, 0x6d5a3a, 1.3); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe7c0, 1.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); scene.add(sun, sun.target);
+const lampLight = new THREE.PointLight(0xffc477, 0, 14, 1.6); scene.add(lampLight);
+const phoneLight = new THREE.PointLight(0x7fb6ff, 0, 6, 1.5); scene.add(phoneLight);
+const candleLight = new THREE.PointLight(0xffa548, 0, 10, 1.6); scene.add(candleLight);
+const sirenLight = new THREE.PointLight(0xff3030, 0, 16, 1.2); scene.add(sirenLight);
+
+// ---------- faces ----------
+function drawFace(x, e, o) {
+  const S = 512; x.fillStyle = e === 'dead' ? '#cdd3d6' : o.skin; x.fillRect(0, 0, S, S);
+  const cx = 256, ey = 236, dx = 52, lk = o.look || 0;
+  if (e !== 'dead') { x.fillStyle = 'rgba(232,120,110,.28)'; x.beginPath(); x.arc(cx - 86, 300, 26, 0, 7); x.arc(cx + 86, 300, 26, 0, 7); x.fill(); }
+  x.strokeStyle = '#1b120c'; x.lineCap = 'round'; x.lineJoin = 'round';
+  const closed = e === 'sleep' || e === 'dead' || e === 'blink';
+  for (const s of [-1, 1]) {
+    const ex = cx + s * dx;
+    if (closed) { x.lineWidth = 9; x.beginPath(); x.arc(ex, ey - 6, 22, .25 * Math.PI, .75 * Math.PI); x.stroke(); if (o.lashes) { x.beginPath(); x.moveTo(ex + s * 22, ey + 8); x.lineTo(ex + s * 32, ey + 2); x.stroke(); } continue; }
+    const r = e === 'shock' ? 34 : 30;
+    x.fillStyle = '#fff'; x.beginPath(); x.ellipse(ex, ey, r * .82, r, 0, 0, 7); x.fill(); x.lineWidth = 7; x.stroke();
+    const pr = e === 'shock' ? 9 : 15; x.fillStyle = o.iris || '#6b3e1e'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr + 5, 0, 7); x.fill(); x.fillStyle = '#120a06'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr - 2, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(ex + lk * 9 - 5, ey - 3, 4, 0, 7); x.fill();
+    if (e === 'suspect' || e === 'tired') { x.fillStyle = o.skin; x.fillRect(ex - r, ey - r - 2, r * 2, r * (e === 'tired' ? .95 : .8)); x.lineWidth = 7; x.beginPath(); x.moveTo(ex - r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.lineTo(ex + r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.stroke(); }
+    if (o.lashes) { x.lineWidth = 6; x.beginPath(); x.moveTo(ex + s * r * .7, ey - r * .7); x.lineTo(ex + s * (r * .7 + 12), ey - r * .7 - 10); x.stroke(); }
+    if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.arc(ex, ey, r + 12, 0, 7); x.stroke(); x.strokeStyle = '#1b120c'; }
+  }
+  if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.moveTo(cx - 10, ey - 6); x.lineTo(cx + 10, ey - 6); x.stroke(); x.strokeStyle = '#1b120c'; }
+  // brows
+  x.lineWidth = 9; x.strokeStyle = o.brow || '#2a1a10';
+  const by = ey - (e === 'shock' ? 58 : 48);
+  for (const s of [-1, 1]) { const ex = cx + s * dx; let inner = 0, outer = 0;
+    if (e === 'sad' || e === 'worried' || e === 'cry' || e === 'plead') { inner = -12; outer = 6; }
+    if (e === 'angry') { inner = 10; outer = -6; }
+    if (e === 'suspect' && s > 0) { inner = -14; outer = -14; }
+    x.beginPath(); x.moveTo(ex - s * 4 - s * -24 * 0 + (s < 0 ? 20 : -20), by + inner); x.lineTo(ex + (s < 0 ? -22 : 22), by + outer); x.stroke(); }
+  // nose
+  x.lineWidth = 6; x.strokeStyle = 'rgba(90,40,20,.6)'; x.beginPath(); x.moveTo(cx - 4, 268); x.quadraticCurveTo(cx + 10, 290, cx - 6, 296); x.stroke();
+  if (o.mustache) { x.fillStyle = o.brow || '#2a1a10'; x.beginPath(); x.moveTo(cx - 52, 330); x.quadraticCurveTo(cx, 296, cx + 52, 330); x.quadraticCurveTo(cx, 318, cx - 52, 330); x.fill(); }
+  // mouth
+  x.strokeStyle = '#3a1a10'; x.lineWidth = 8; x.fillStyle = '#5a2418';
+  const my = 330;
+  if (e === 'smile' || e === 'happy') { x.beginPath(); x.moveTo(cx - 34, my - 6); x.quadraticCurveTo(cx, my + 26, cx + 34, my - 6); x.stroke(); }
+  else if (e === 'talk' || e === 'shock') { x.beginPath(); x.ellipse(cx, my + 4, e === 'shock' ? 16 : 18, e === 'shock' ? 22 : 12, 0, 0, 7); x.fill(); }
+  else if (e === 'sad' || e === 'cry') { x.beginPath(); x.moveTo(cx - 26, my + 10); x.quadraticCurveTo(cx, my - 8, cx + 26, my + 10); x.stroke(); }
+  else if (e === 'worried' || e === 'plead') { x.beginPath(); x.moveTo(cx - 28, my + 4); x.quadraticCurveTo(cx - 14, my - 6, cx, my + 4); x.quadraticCurveTo(cx + 14, my + 12, cx + 28, my + 2); x.stroke(); }
+  else if (e === 'sleep') { x.beginPath(); x.arc(cx, my, 8, 0, Math.PI); x.stroke(); }
+  else if (e === 'dead') { x.beginPath(); x.moveTo(cx - 18, my + 4); x.lineTo(cx + 18, my + 4); x.stroke(); }
+  else { x.beginPath(); x.moveTo(cx - 22, my + 2); x.lineTo(cx + 22, my + 2); x.stroke(); }
+  if (e === 'cry' || e === 'plead') { x.fillStyle = 'rgba(120,190,240,.85)'; for (const s of [-1, 1]) { x.beginPath(); x.ellipse(cx + s * dx + s * 6, ey + 58, 9, 22, 0, 0, 7); x.fill(); } }
+  if (e === 'sweat') {}
+}
+
+// ---------- characters ----------
+const CHARS = {};
+function makeChar(name, o) {
+  const G = new THREE.Group(); G.userData = { o, faces: {} };
+  const skinM = mat(o.skin);
+  // legs
+  const legs = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .2, .95, 0); const l = cyl(.15, .13, .9, o.pants, {}, 12); l.position.y = -.45; p.add(l); const sh = box(.3, .16, .42, 0x2a2420); sh.position.set(0, -.92, .06); p.add(sh); G.add(p); legs.push(p); }
+  // torso
+  const torsoGeo = new THREE.CapsuleGeometry(.46, .55, 8, 16); const torso = M(torsoGeo, o.shirt); torso.position.y = 1.42; torso.scale.set(1, 1, .82); G.add(torso);
+  if (o.collar) { const c = box(.5, .12, .1, o.collar, { ink: false }); c.position.set(0, 1.86, .36); G.add(c); }
+  // arms
+  const arms = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .54, 1.78, 0); const a = M(new THREE.CapsuleGeometry(.12, .52, 6, 10), o.shirt); a.position.y = -.38; p.add(a); const h = sph(.14, o.skin); h.position.y = -.76; p.add(h); p.rotation.z = s * .12; G.add(p); arms.push(p); }
+  // head
+  const hp = new THREE.Group(); hp.position.y = 2.42; G.add(hp);
+  const hg = new THREE.SphereGeometry(.56, 40, 30); hg.scale(1, 1.16, 1);
+  const head = new THREE.Mesh(hg, new THREE.MeshToonMaterial({ gradientMap: grad })); head.rotation.y = -Math.PI / 2; head.castShadow = true; ink(head, 1.035); hp.add(head);
+  for (const s of [-1, 1]) { const e = sph(.11, o.skin); e.scale.set(.6, 1, 1); e.position.set(s * .56, 0, 0); hp.add(e); }
+  // hair
+  const hc = o.hairCol;
+  if (o.hair === 'short' || o.hair === 'long' || o.hair === 'bun') { const capG = new THREE.SphereGeometry(.605, 32, 20, 0, Math.PI * 2, 0, Math.PI * .34); capG.scale(1, 1.16, 1); const cap = M(capG, hc); cap.rotation.x = -.22; hp.add(cap);
+    const bkG = new THREE.SphereGeometry(.6, 28, 18, Math.PI, Math.PI, 0, Math.PI * .66); bkG.scale(1.02, 1.17, 1.03); const back = M(bkG, hc, { ink: false }); hp.add(back); }
+  if (o.hair === 'long') { const lb = box(1.1, 1.05, .3, hc); lb.position.set(0, -.5, -.42); hp.add(lb); for (const sx of [-1, 1]) { const sd = box(.16, .95, .34, hc, { ink: false }); sd.position.set(sx * .6, -.38, -.22); hp.add(sd); }
+    }
+  if (o.hair === 'bun') { const b = sph(.26, hc); b.position.set(0, .62, -.3); hp.add(b); }
+  if (o.hair === 'bald') { for (const s of [-1, 1]) { const t = sph(.2, hc, { ink: false }); t.scale.set(.6, 1, 1.3); t.position.set(s * .5, .08, -.1); hp.add(t); } }
+  G.userData.parts = { legs, arms, hp, head, torso };
+  scene.add(G); CHARS[name] = G; return G;
+}
+function face(ch, e, look = 0) { const key = e + '|' + look; const f = ch.userData.faces; if (!f[key]) f[key] = texCanvas(512, 512, (x) => drawFace(x, e, { ...ch.userData.o, look })); const h = ch.userData.parts.head; if (h.material.map !== f[key]) { h.material.map = f[key]; h.material.needsUpdate = true; } }
+function pose(ch, p = {}) {
+  const { legs, arms, hp, torso } = ch.userData.parts; ch.visible = p.visible !== false;
+  ch.position.set(...(p.pos || [0, 0, 0])); ch.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0); ch.scale.setScalar(p.s || 1);
+  const w = p.walk; const sw = w != null ? Math.sin(w) * .55 : 0;
+  legs[0].rotation.x = sw; legs[1].rotation.x = -sw;
+  if (p.sit) { legs[0].rotation.x = legs[1].rotation.x = -1.45; }
+  arms[0].rotation.set(p.aL != null ? p.aL : -sw * .7, 0, -.12 - (p.aLz || 0)); arms[1].rotation.set(p.aR != null ? p.aR : sw * .7, 0, .12 + (p.aRz || 0));
+  hp.rotation.set(p.hx || 0, p.hy || 0, p.hz || 0); hp.position.y = 2.42 + (w != null ? Math.abs(Math.cos(w)) * .04 : 0) + (p.breath || 0);
+  face(ch, p.e || 'neutral', p.look || 0);
+}
+// ---------- overlays (2D on top of render) ----------
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function T(s, X, Y, size, col, o = {}) { o2.font = `${o.w || 800} ${size}px Poppins`; o2.textAlign = o.a || 'center'; o2.textBaseline = 'middle'; if (o.stroke) { o2.lineJoin = 'round'; o2.lineWidth = o.stroke; o2.strokeStyle = o.sc || '#1b120c'; o2.strokeText(s, X, Y); } o2.fillStyle = col; o2.fillText(s, X, Y); }
+function phoneUI(X, Y, s, o = {}) { // big phone lockscreen
+  o2.save(); o2.translate(X, Y); o2.rotate(o.rot || 0); o2.scale(s, s);
+  o2.shadowColor = 'rgba(0,0,0,.5)'; o2.shadowBlur = 50; o2.shadowOffsetY = 20; o2.fillStyle = '#16181c'; rr(o2, -260, -520, 520, 1040, 70); o2.fill(); o2.shadowColor = 'transparent';
+  const g = o2.createLinearGradient(0, -500, 0, 500); g.addColorStop(0, o.bg1 || '#2a2f6a'); g.addColorStop(1, o.bg2 || '#141633'); o2.fillStyle = g; rr(o2, -238, -496, 476, 992, 54); o2.fill();
+  o2.fillStyle = '#000'; rr(o2, -70, -480, 140, 34, 17); o2.fill();
+  if (o.time) { T(o.time, 0, -330, 130, '#fff', { w: 600 }); T(o.date || '', 0, -235, 34, 'rgba(255,255,255,.8)', { w: 600 }); }
+  if (o.notif) { const k = eback(cl(o.notif)); o2.save(); o2.translate((o.swipe || 0) * 400, -60); o2.scale(k, k); o2.fillStyle = 'rgba(255,255,255,.92)'; rr(o2, -210, -70, 420, 140, 28); o2.fill(); o2.fillStyle = '#1b120c'; rr(o2, -185, -45, 50, 50, 12); o2.fill(); T('!', -160, -20, 34, '#fff'); T('AVISO · agora', -120, -38, 24, '#555', { a: 'left', w: 600 }); T('Despeça-se.', -120, 12, 42, '#111', { a: 'left', w: 800 }); o2.restore(); }
+  if (o.empty) T('Sem notificações', 0, -40, 34, 'rgba(255,255,255,.7)', { w: 600 });
+  if (o.off) { o2.fillStyle = `rgba(0,0,0,${o.off})`; rr(o2, -238, -496, 476, 992, 54); o2.fill(); }
+  o2.restore();
+}
+function pillTag(s, X, Y, k, col = '#fff', bg = '#d8423a') { if (k <= 0) return; const kk = eback(cl(k)); o2.save(); o2.translate(X, Y); o2.scale(kk, kk); o2.rotate(-.04); o2.font = '900 64px Poppins'; const w = o2.measureText(s).width + 70; o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 20; o2.shadowOffsetY = 8; o2.fillStyle = bg; rr(o2, -w / 2, -52, w, 104, 22); o2.fill(); o2.shadowColor = 'transparent'; T(s, 0, 4, 64, col, { w: 900 }); o2.restore(); }
+function calendarUI(X, Y, s, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)) * s; o2.scale(kk, kk); o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 30; o2.shadowOffsetY = 14; o2.fillStyle = '#fffaf0'; rr(o2, -330, -330, 660, 660, 30); o2.fill(); o2.shadowColor = 'transparent'; o2.fillStyle = '#d8423a'; rr(o2, -330, -330, 660, 120, 30); o2.fill(); o2.fillRect(-330, -250, 660, 40); T('DIAS', 0, -270, 58, '#fff', { w: 900 });
+  for (let i = 0; i < 28; i++) { const cx = -250 + (i % 7) * 83, cy = -150 + Math.floor(i / 7) * 95; T('' + (i + 1), cx, cy, 34, '#3a2a20', { w: 700 }); if (i < 12 && k > .5) { o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.beginPath(); o2.moveTo(cx - 20, cy - 20); o2.lineTo(cx + 20, cy + 20); o2.moveTo(cx + 20, cy - 20); o2.lineTo(cx - 20, cy + 20); o2.stroke(); } if (i === 22) { o2.fillStyle = '#d8423a'; o2.beginPath(); o2.arc(cx, cy, 36, 0, 7); o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.stroke(); } }
+  o2.restore(); }
+function newspaperUI(X, Y, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); o2.rotate(lerp(3, -.05, eo(cl(k)))); const s = lerp(.1, 1, eo(cl(k))); o2.scale(s, s); o2.shadowColor = 'rgba(0,0,0,.4)'; o2.shadowBlur = 40; o2.shadowOffsetY = 18; o2.fillStyle = '#f5efe2'; o2.fillRect(-330, -420, 660, 840); o2.shadowColor = 'transparent'; T('O DIÁRIO', 0, -350, 54, '#1b120c', { w: 900 }); o2.fillStyle = '#1b120c'; o2.fillRect(-290, -310, 580, 5); T('AVISO', 0, -220, 110, '#1b120c', { w: 900 }); T('FALHOU?', 0, -110, 110, '#1b120c', { w: 900 }); o2.fillStyle = '#8a8a8a'; rr(o2, -280, -30, 250, 330, 10); o2.fill(); o2.fillStyle = '#2a2a2a'; rr(o2, -210, 40, 110, 190, 14); o2.fill(); o2.fillStyle = 'rgba(27,18,12,.35)'; for (let i = 0; i < 10; i++) o2.fillRect(10, -20 + i * 34, 270 - (i % 3) * 40, 14); o2.restore(); }
+function contactsUI(X, Y, k, t) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.fillStyle = '#16181c'; rr(o2, -230, -400, 460, 800, 50); o2.fill(); o2.fillStyle = '#20243a'; rr(o2, -212, -380, 424, 760, 36); o2.fill(); T('CONTATOS', 0, -320, 36, '#fff', { w: 800 }); ['Mãe', 'Bia', 'Chefe', 'Tio Zé', 'Ana', 'Rafa', 'Vó Lia'].forEach((n, i) => { const y = -230 + i * 90; o2.fillStyle = 'rgba(255,255,255,.12)'; o2.beginPath(); o2.arc(-150, y, 28, 0, 7); o2.fill(); T(n, -100, y, 34, '#fff', { a: 'left', w: 600 }); const on = (t * 2.5) % 7 > i; o2.fillStyle = on ? '#3fbf6a' : 'rgba(255,255,255,.2)'; o2.beginPath(); o2.arc(150, y, 26, 0, 7); o2.fill(); }); o2.restore(); }
+function bigClock(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); o2.font = '900 150px Poppins'; const sz = Math.min(150, 150 * 960 / o2.measureText(s).width); T(s, X, Y, sz, col, { w: 900, stroke: 18, sc: '#1b120c' }); o2.restore(); }
+
+// ===== horror story: bunk bed at grandma's =====
+const camera = new THREE.PerspectiveCamera(40, W / H, .1, 400);
+const ALL = [];
+const YOU = makeChar('you', { skin: '#E8B48C', hair: 'short', hairCol: 0x2a1a12, shirt: 0x6a7fa8, pants: 0x3a4a6a, iris: '#4a2a14' }); ALL.push(YOU);
+const DUDA = makeChar('duda', { skin: '#F1C7A3', hair: 'long', hairCol: 0x3a2416, shirt: 0xbfd3ea, pants: 0xbfd3ea, lashes: true, iris: '#3a2416' }); ALL.push(DUDA);
+YOU.rotation.order = 'YXZ'; DUDA.rotation.order = 'YXZ';
+// phone attached to YOU (held above face when lying)
+const PH = new THREE.Group(); { const b = box(.36, .7, .05, 0x1a1a1e); PH.add(b); const scr = new THREE.Mesh(new THREE.PlaneGeometry(.32, .64), new THREE.MeshBasicMaterial({ color: 0x9fd0ff })); scr.position.z = .03; PH.add(scr); } YOU.add(PH); PH.position.set(.25, 2.05, 1.15); PH.rotation.set(0, Math.PI, 0);
+const phoneGlow = new THREE.PointLight(0x9fd0ff, 0, 5, 1.4); YOU.add(phoneGlow); phoneGlow.position.set(.2, 2.2, .8);
+
+// ---------- sets ----------
+const SETS = {};
+function setG(name, ox) { const G = new THREE.Group(); G.position.set(ox, 0, 0); scene.add(G); SETS[name] = G; return G; }
+// BEDROOM (bunk)
+const ROOM = setG('room', 0);
+{ const G = ROOM; const fl = box(16, .2, 14, 0x4a3a30, { ink: false }); fl.position.y = -.1; G.add(fl); const bw = box(16, 9, .2, 0x2b3560, { ink: false }); bw.position.set(0, 4.5, -3); G.add(bw); const sw = box(.2, 9, 14, 0x26305a, { ink: false }); sw.position.set(-6, 4.5, 3); G.add(sw); const cl_ = box(16, .2, 14, 0x232a4a, { ink: false }); cl_.position.set(0, 7.6, 3); G.add(cl_);
+  // window w/ moon
+  const wf = box(2.2, 2.2, .12, 0x1a1f3a); wf.position.set(3.8, 4.8, -2.85); G.add(wf); const gl = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 1.9), new THREE.MeshBasicMaterial({ color: 0x3a4a8a })); gl.position.set(3.8, 4.8, -2.78); G.add(gl); const moon = new THREE.Mesh(new THREE.CircleGeometry(.3, 24), new THREE.MeshBasicMaterial({ color: 0xf4efd8 })); moon.position.set(4.2, 5.2, -2.77); G.add(moon); const b1 = box(.08, 1.9, .05, 0x1a1f3a, { ink: false }); b1.position.set(3.8, 4.8, -2.74); G.add(b1);
+  // bunk bed along x, against back wall
+  const wood = 0x7a4a2e; for (const x of [-3.0, 1.4]) for (const z of [-2.7, -1.0]) { const p = box(.22, 4.6, .22, wood); p.position.set(x, 2.3, z); G.add(p); }
+  for (const y of [.7, 2.9]) { const fr = box(4.6, .3, 1.9, wood); fr.position.set(-.8, y, -1.85); G.add(fr); const mt = box(4.3, .3, 1.65, 0xe9e3d6); mt.position.set(-.8, y + .3, -1.85); G.add(mt); }
+  const pil1 = box(.8, .25, 1.2, 0xffffff); pil1.position.set(-2.5, 1.12, -1.85); G.add(pil1); const pil2 = box(.8, .25, 1.2, 0xffffff); pil2.position.set(-2.5, 3.32, -1.85); G.add(pil2);
+  const rail = box(4.6, .18, .12, wood); rail.position.set(-.8, 3.75, -.95); G.add(rail);
+  for (let i = 0; i < 5; i++) { const r = box(.6, .08, .08, wood, { ink: false }); r.position.set(1.75, .8 + i * .5, -.9); G.add(r); } for (const z of [-.9]) { for (const dx of [1.45, 2.05]) { const s = box(.08, 2.8, .08, wood, { ink: false }); s.position.set(dx, 1.6, z); G.add(s); } }
+  // quilt on bottom bunk (legs side only)
+  const q = box(2.0, .5, 1.75, 0x8a5a9a); q.position.set(.4, 1.25, -1.85); G.add(q);
+  // door on right wall area (front-right)
+  const doorPiv = new THREE.Group(); doorPiv.position.set(4.2, 0, 1.6); G.add(doorPiv); const door = box(2.0, 4.4, .16, 0x5a3a22); door.position.set(1.0, 2.2, 0); doorPiv.add(door); const knob = new THREE.Group(); knob.position.set(1.75, 2.1, .14); doorPiv.add(knob); const kb = cyl(.06, .06, .15, 0xd4b04a); kb.rotation.x = Math.PI / 2; knob.add(kb); const kl = box(.38, .08, .08, 0xd4b04a); kl.position.set(-.16, 0, .08); knob.add(kl); G.userData.door = doorPiv; G.userData.knob = knob;
+  const frameL = box(.2, 4.6, .3, 0x3a2416); frameL.position.set(4.1, 2.3, 1.6); G.add(frameL); const frameR = box(.2, 4.6, .3, 0x3a2416); frameR.position.set(6.3, 2.3, 1.6); G.add(frameR); const frameT = box(2.4, .2, .3, 0x3a2416); frameT.position.set(5.2, 4.6, 1.6); G.add(frameT);
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 4.4), new THREE.MeshBasicMaterial({ color: 0xffc77a })); back.position.set(5.2, 2.2, 1.45); G.add(back); G.userData.doorLight = back;
+  // poster
+  const ps = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.6), mat(0x8a4a4a)); ps.position.set(-4.6, 4.8, -2.88); G.add(ps); }
+// ceiling fan
+const FAN = new THREE.Group(); { const rod = cyl(.06, .06, .6, 0x2a2a2a); rod.position.y = .3; FAN.add(rod); const hub = cyl(.35, .3, .3, 0x6a6a6a); FAN.add(hub); const bl = new THREE.Group(); FAN.add(bl); for (let i = 0; i < 4; i++) { const b = box(1.9, .05, .38, 0x8a5a33); b.position.x = 1.15; const p = new THREE.Group(); p.rotation.y = i * Math.PI / 2; p.add(b); bl.add(p); } FAN.userData.blades = bl; } FAN.position.set(-.4, 6.9, .8); ROOM.add(FAN);
+// sheet-covered lump on top bunk (the "thing")
+const LUMP = new THREE.Group(); { const cloth = mat(0xd7dde8); const body = new THREE.Mesh(new THREE.CapsuleGeometry(.5, 2.0, 8, 16), cloth); body.rotation.z = Math.PI / 2; body.scale.set(1, 1, .9); body.castShadow = true; ink(body, 1.03); LUMP.add(body); const head = new THREE.Mesh(new THREE.SphereGeometry(.55, 20, 16), cloth); head.position.set(-1.65, .12, .05); head.castShadow = true; ink(head, 1.03); LUMP.add(head); LUMP.userData.head = head;
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(.35, 12, 8), cloth); f.scale.set(1.4, .4, 1); f.position.set(-.8 + i * .6, .42, .15 - (i % 2) * .2); LUMP.add(f); }
+  const eyes = new THREE.Group(); for (const s of [-.14, .14]) { const e = new THREE.Mesh(new THREE.SphereGeometry(.05, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })); e.position.set(-1.62 + s, .1, .56); eyes.add(e); } eyes.visible = false; LUMP.add(eyes); LUMP.userData.eyes = eyes; }
+LUMP.position.set(-.6, 3.72, -2.05); ROOM.add(LUMP);
+// HOUSE exterior
+const HOUSE = setG('house', 80); { const G = HOUSE; const fl = box(80, .2, 80, 0x2a3a2a, { ink: false }); fl.position.y = -.1; G.add(fl); const h = box(7, 4, 5, 0xd9cfa8); h.position.set(0, 2, -4); G.add(h); const rsh = new THREE.Shape([new THREE.Vector2(-3, 0), new THREE.Vector2(3, 0), new THREE.Vector2(0, 2.2)]); const rg = new THREE.ExtrudeGeometry(rsh, { depth: 7.6, bevelEnabled: false }); rg.translate(0, 0, -3.8); const roof = M(rg, 0xa8453a); roof.rotation.y = Math.PI / 2; roof.position.set(0, 4.0, -4); G.add(roof);
+  const d = box(1.2, 2.2, .1, 0x5a3a22); d.position.set(0, 1.1, -1.45); G.add(d); for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.3), new THREE.MeshBasicMaterial({ color: s < 0 ? 0x1a2040 : 0xffc77a })); w.position.set(s * 2.3, 2.5, -1.44); G.add(w); }
+  for (let i = 0; i < 24; i++) { const p = box(.16, 1.0, .1, 0xcfc6a8); p.position.set(-8 + i * .7, .5, 2.4); G.add(p); } for (const x of [-7, 7]) { const tr = cyl(.2, .3, 2.4, 0x3a2a1a); tr.position.set(x, 1.2, -3); G.add(tr); const c = sph(1.6, 0x1f3a24); c.position.set(x, 3.3, -3); G.add(c); } }
+// LIVING ROOM w/ pendulum clock
+const LIVR = setG('livr', 160); { const G = LIVR; const fl = box(14, .2, 12, 0x3a2a22, { ink: false }); fl.position.y = -.1; G.add(fl); const bw = box(14, 9, .2, 0x2a2440, { ink: false }); bw.position.set(0, 4.5, -3); G.add(bw);
+  const cb = box(1.4, 5.2, .7, 0x5a3418); cb.position.set(0, 2.6, -2.5); G.add(cb); const face_ = new THREE.Mesh(new THREE.CircleGeometry(.5, 32), mat(0xf3ead8)); face_.position.set(0, 4.3, -2.13); G.add(face_); const win = new THREE.Mesh(new THREE.PlaneGeometry(.9, 2.4), new THREE.MeshBasicMaterial({ color: 0x1a1208 })); win.position.set(0, 2.2, -2.13); G.add(win);
+  const pend = new THREE.Group(); pend.position.set(0, 3.3, -2.08); G.add(pend); const rod = box(.05, 1.6, .03, 0xd4b04a, { ink: false }); rod.position.y = -.8; pend.add(rod); const bob = cyl(.22, .22, .06, 0xd4b04a); bob.rotation.x = Math.PI / 2; bob.position.y = -1.65; pend.add(bob); G.userData.pend = pend;
+  for (const a of [0, 1]) { const h = box(.04, a ? .38 : .28, .02, 0x1b120c, { ink: false }); h.geometry.translate(0, a ? .19 : .14, 0); h.position.set(0, 4.3, -2.1); h.rotation.z = a ? 0 : -Math.PI / 2 * 2 * (3 / 12) * 2; G.add(h); }
+  const sofa = box(3.6, 1.0, 1.4, 0x6a3a3a); sofa.position.set(3.6, .6, -1.6); G.add(sofa); const sb = box(3.6, 1.2, .4, 0x6a3a3a); sb.position.set(3.6, 1.4, -2.3); G.add(sb); }
+// CORRIDOR
+const COR = setG('cor', 240); { const G = COR; const fl = box(6, .2, 40, 0x6a4a30, { ink: false }); fl.position.y = -.1; G.add(fl); for (let i = 0; i < 30; i++) { const ln = box(6, .02, .04, 0x4a3220, { ink: false }); ln.position.set(0, .01, 10 - i * 1.2); G.add(ln); }
+  for (const s of [-1, 1]) { const w = box(.2, 6, 40, 0x3a3150, { ink: false }); w.position.set(s * 2.4, 3, -8); G.add(w); for (let i = 0; i < 3; i++) { const d = box(.1, 4, 1.8, 0x4a2e1a); d.position.set(s * 2.28, 2, 2 - i * 9); G.add(d); } }
+  const ceil = box(6, .2, 40, 0x221d33, { ink: false }); ceil.position.set(0, 6, -8); G.add(ceil); }
+const SLIP = new THREE.Group(); { for (const s of [-1, 1]) { const g = new THREE.Group(); const sole = box(.5, .12, 1.1, 0x3f6fb3); sole.position.y = .06; g.add(sole); const strap = box(.5, .12, .22, 0xffffff, { ink: false }); strap.position.set(0, .18, -.2); g.add(strap); const leg = cyl(.16, .14, 1.6, 0xbfd3ea); leg.position.set(0, 1.0, .1); g.add(leg); const foot = sph(.2, 0xF1C7A3); foot.scale.set(1, .6, 1.8); foot.position.set(0, .26, -.1); g.add(foot); g.position.x = s * .32; SLIP.add(g); } } COR.add(SLIP);
+
+// ---------- light rig ----------
+const moonL = new THREE.DirectionalLight(0x7f9fff, .6); moonL.castShadow = true; moonL.shadow.mapSize.set(1024, 1024); Object.assign(moonL.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 60 }); scene.add(moonL, moonL.target);
+const warm = new THREE.PointLight(0xffb060, 0, 14, 1.4); scene.add(warm);
+function night(G, k = 1) { hemi.intensity = .55 * k; hemi.color.set(0x8a9ae8); hemi.groundColor.set(0x1a1a33); sun.intensity = 0; moonL.intensity = .9 * k; moonL.position.set(G.position.x + 6, 12, 8); moonL.target.position.set(G.position.x, 1, -1); scene.background = new THREE.Color(0x0c0f22); scene.fog = new THREE.Fog(0x0c0f22, 18, 60); warm.intensity = 0; lampLight.intensity = 0; phoneGlow.intensity = 0; }
+function hn(t, s) { return Math.sin(t * 13.1 + s) * .5 + Math.sin(t * 27.7 + s * 2) * .3 + Math.sin(t * 5.3 + s * 3) * .2; }
+let SHAKE = 0;
+function cam(G, p, l, fov = 40, lt = 1) { const sx = hn(lt, 1) * SHAKE, sy = hn(lt, 5) * SHAKE; camera.position.set(G.position.x + p[0] + sx, p[1] + sy, G.position.z + p[2]); camera.lookAt(G.position.x + l[0] + sx * .4, l[1] + sy * .4, G.position.z + l[2]); camera.fov = fov * (1 + .1 * (1 - eo(cl(lt / .35)))); camera.updateProjectionMatrix(); }
+const P = (G, x, y, z) => [G.position.x + x, y, G.position.z + z];
+const L3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+const blinkE = (t, e = 'neutral', seed = 0) => (((t + seed) % 3.1) < .12 ? 'blink' : e);
+const talk = (t) => (Math.floor(t * 9) % 2 ? 'talk' : 'neutral');
+function hideAll() { ALL.forEach(c => c.visible = false); SLIP.visible = false; }
+// YOU lying on the bottom bunk: feet toward +x, head at -x, face up
+function youInBed(e, o = {}) { const G = ROOM; pose(YOU, { pos: P(G, 1.3, 1.42, -1.85), rx: -Math.PI / 2, ry: Math.PI / 2, e, hy: o.hy || 0, look: o.look || 0, aL: 0, aR: o.phone ? -1.45 : 0 }); YOU.rotation.order = 'YXZ'; PH.visible = !!o.phone; if (o.phone) { phoneGlow.intensity = 3; PH.position.set(.45 + (o.tremble ? Math.sin(o.t * 50) * .02 : 0), 1.85, 1.05); } }
+
+// ---------- chat overlay ----------
+const MSG = [
+  [23.6, 'me', 'Tá acordada? Esse ventilador vai cair na nossa cabeça.'],
+  [28.73, 'd', 'Vai nada. Dorme.'],
+  [36.57, 'd', 'A vó trancou a porta da cozinha?'],
+  [41.85, 'me', 'Sei lá. Por quê?'],
+  [46.71, 'd', 'Porque tem alguém andando no corredor.'],
+  [60.38, 'me', 'Duda, para. Não tem graça.'],
+  [62.22, 'd', 'Eu não tô brincando.'],
+  [79.95, 'me', 'Por que você não responde quando eu te chamo?'],
+  [85.55, 'd', 'Porque eu não tô no quarto. Eu dormi no sofá da sala. Sou eu aqui no corredor.'],
+  [97.17, 'd', 'Não chama ninguém. E não deixa ela perceber que você sabe.'],
+];
+const TYPING = [[43.11, 44.8], [45.59, 46.7], [76.38, 79.0], [81.95, 85.5], [95.3, 97.1]];
+function wrap(s, maxW, size) { o2.font = `600 ${size}px Poppins`; const words = s.split(' '); const lines = []; let cur = ''; for (const w of words) { const t2 = cur ? cur + ' ' + w : w; if (o2.measureText(t2).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t2; } if (cur) lines.push(cur); return lines; }
+function chatUI(t, X, Y, s, o = {}) {
+  o2.save(); o2.translate(X + (o.tremble ? Math.sin(t * 60) * 4 : 0), Y); o2.rotate(o.rot || 0); o2.scale(s, s);
+  o2.shadowColor = 'rgba(0,0,0,.6)'; o2.shadowBlur = 60; o2.fillStyle = '#121418'; rr(o2, -300, -560, 600, 1120, 70); o2.fill(); o2.shadowColor = 'transparent';
+  o2.fillStyle = '#0d1116'; rr(o2, -276, -536, 552, 1072, 52); o2.fill();
+  // header
+  o2.fillStyle = '#1b222b'; rr(o2, -276, -536, 552, 150, 52); o2.fill(); o2.fillRect(-276, -440, 552, 54);
+  o2.fillStyle = '#6a7fa8'; o2.beginPath(); o2.arc(-200, -455, 34, 0, 7); o2.fill(); T('D', -200, -453, 36, '#fff', { w: 800 });
+  T('Duda', -150, -472, 36, '#fff', { a: 'left', w: 800 }); const typ = TYPING.some(([a, b]) => t >= a && t < b); T(typ ? 'digitando...' : 'online', -150, -432, 26, typ ? '#5fd38a' : '#9aa4b0', { a: 'left', w: 600 });
+  // messages from bottom up
+  const shown = MSG.filter(m => t >= m[0]); let y = 430; const size = 30;
+  if (typ) { o2.fillStyle = '#252d38'; rr(o2, -250, y - 70, 130, 64, 26); o2.fill(); for (let i = 0; i < 3; i++) { o2.fillStyle = `rgba(255,255,255,${.4 + .6 * (Math.floor(t * 4) % 3 === i ? 1 : 0)})`; o2.beginPath(); o2.arc(-216 + i * 30, y - 38, 8, 0, 7); o2.fill(); } y -= 90; }
+  for (let i = shown.length - 1; i >= 0 && y > -360; i--) { const [t0, who, txt] = shown[i]; const lines = wrap(txt, 360, size); const h = lines.length * 42 + 34; const w = Math.max(...lines.map(l => { o2.font = `600 ${size}px Poppins`; return o2.measureText(l).width; })) + 50; const k = eback(prog(t, t0, t0 + .25)); const me = who === 'me';
+    o2.save(); const bx = me ? 250 - w : -250; o2.translate(bx + (me ? w : 0), y); o2.scale(k, k); o2.translate(-(me ? w : 0), 0); o2.fillStyle = me ? '#1f6b4f' : '#252d38'; rr(o2, 0, -h, w, h, 24); o2.fill(); lines.forEach((l, j) => T(l, 25, -h + 34 + j * 42, size, '#eef2f5', { a: 'left', w: 600 })); o2.restore(); y -= h + 22; }
+  // input bar
+  o2.fillStyle = '#1b222b'; rr(o2, -250, 460, 420, 64, 32); o2.fill(); T('Mensagem', -215, 493, 26, '#6a7480', { a: 'left', w: 600 }); o2.fillStyle = '#1f9a5a'; o2.beginPath(); o2.arc(215, 492, 34, 0, 7); o2.fill();
+  o2.restore();
+}
+function clockTag(t) { const s = t < 42 ? '03:00' : t < 76 ? '03:01' : '03:02'; o2.save(); o2.fillStyle = 'rgba(10,12,24,.6)'; rr(o2, 40, 56, 270, 96, 22); o2.fill(); T('CASA DA VÓ', 66, 84, 22, '#ffc83d', { a: 'left', w: 800 }); T(s, 66, 122, 44, '#fff', { a: 'left', w: 800 }); o2.restore(); }
+function whisper(s, X, Y, k, size = 60, col = 'rgba(255,255,255,.85)') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 2); T(s, X, Y, size, col, { w: 800 }); o2.restore(); }
+function sfx(s, X, Y, k, rot = -.1, col = '#fff') { if (k <= 0 || k >= 1) return; o2.save(); o2.translate(X, Y); o2.rotate(rot); const kk = eback(cl(k * 3)); o2.scale(kk, kk); o2.globalAlpha = 1 - cl((k - .6) / .4); T(s, 0, 0, 70, col, { w: 900, stroke: 12, sc: '#0a0a14' }); o2.restore(); }
+
+// ---------- shots ----------
+const SH = []; const shot = (t0, fn) => SH.push({ t0, fn });
+const BED_TOP = [-.6, 3.9, -2.0];
+// 0 HOOK: phone lights up at 3am — lockscreen with notification
+shot(0, (t, lt) => { night(ROOM, .7); youInBed('tired', { phone: true, t }); SHAKE = t > 2.8 && t < 3.2 ? .06 : 0; cam(ROOM, [1.8, 2.6, 3.4], [-.9, 1.6, -1.85], 38, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.55)'; o2.fillRect(0, 0, W, H); phoneUI(W / 2, 900, .95, { time: '03:00', date: 'quinta-feira', bg1: '#1d2140', bg2: '#0b0c18' }); if (t > 2.3) { const k = eback(prog(t, 2.3, 2.6)); o2.save(); o2.translate(W / 2, 840); o2.scale(k * .95, k * .95); o2.fillStyle = 'rgba(255,255,255,.92)'; rr(o2, -210, -70, 420, 140, 28); o2.fill(); o2.fillStyle = '#6a7fa8'; o2.beginPath(); o2.arc(-160, -10, 28, 0, 7); o2.fill(); T('D', -160, -8, 30, '#fff'); T('Duda', -115, -32, 30, '#111', { a: 'left', w: 800 }); T('1 nova mensagem', -115, 12, 26, '#555', { a: 'left', w: 600 }); o2.restore(); } }; });
+// 1 she's on the top bunk — tilt up from bottom bunk
+shot(3.44, (t, lt) => { night(ROOM); youInBed(blinkE(t, 'worried'), { phone: true, t }); const k = eio(cl(lt / 3.2)); SHAKE = 0; cam(ROOM, L3([1.8, 2.1, 3.6], [1.2, 4.6, 3.4], k), L3([-.6, 1.4, -1.85], BED_TOP, k), 40, lt);
+  SH.ov = () => whisper('CAMA DE CIMA DO BELICHE', W / 2, 330, prog(t, 5.3, 5.6), 46, '#ffc83d'); });
+// 2 grandma's house in the countryside
+shot(6.8, (t, lt) => { night(HOUSE); scene.fog = new THREE.Fog(0x0c0f22, 20, 70); warm.intensity = 4; warm.position.set(...P(HOUSE, 2.3, 2.6, -.4)); SHAKE = 0; const k = eio(cl(lt / 1.8)); cam(HOUSE, [lerp(-4, 0, k), 3.8, lerp(24, 19, k)], [0, 3.0, -3], 40, lt);
+  SH.ov = () => { for (let i = 0; i < 60; i++) { o2.fillStyle = `rgba(255,255,255,${.3 + .5 * Math.abs(Math.sin(t * 2 + i))})`; o2.beginPath(); o2.arc((i * 137) % W, (i * 71) % 620, 2, 0, 7); o2.fill(); } whisper('CASA DA VÓ · INTERIOR', W / 2, 330, prog(t, 7.0, 7.3), 46, '#ffc83d'); }; });
+// 3 ceiling fan slowly turning, creaking
+shot(8.56, (t, lt) => { night(ROOM, 1.8); FAN.userData.blades.rotation.y = t * 1.6; FAN.rotation.z = Math.sin(t * 1.6) * .03; SHAKE = 0; cam(ROOM, [.6, 4.0, 5.2], [-.4, 6.6, .8], 44, lt); SH.ov = () => { sfx('nhééc', 760, 640, ((t - 10.64) % 1.9) / 1.2, .12); }; });
+// 4 you're on the bottom bunk
+shot(12.24, (t, lt) => { night(ROOM); youInBed(blinkE(t, 'tired'), { hy: -.5, look: -1 }); SHAKE = 0; cam(ROOM, [1.2, 2.2, 3.0], [-.8, 1.45, -1.85], 38, lt); SH.ov = () => whisper('VOCÊ · CAMA DE BAIXO', W / 2, 330, prog(t, 12.8, 13.1), 46, '#ffc83d'); });
+// 5 Duda sleeps facing the wall, wrapped in the sheet up to her head
+shot(13.8, (t, lt) => { night(ROOM); SHAKE = 0; const k = eio(cl(lt / 5)); cam(ROOM, L3([1.6, 5.4, 2.4], [.2, 4.6, .6], k), [-1.0, 3.8, -2.0], 40, lt); SH.ov = () => whisper('DUDA', W / 2, 330, prog(t, 14.68, 15.0), 52, '#ffc83d'); });
+// 6 it's hot, you can't sleep
+shot(18.84, (t, lt) => { night(ROOM); youInBed(blinkE(t, 'worried'), { hy: -.4 }); FAN.userData.blades.rotation.y = t * 1.6; SHAKE = 0; cam(ROOM, [.8, 2.3, 2.4], [-1.0, 1.5, -1.85], 42, lt);
+  SH.ov = () => { for (let i = 0; i < 3; i++) { const p = ((t * .7 + i / 3) % 1); o2.fillStyle = 'rgba(140,200,255,.85)'; const x = 380 + i * 140, y = 900 + p * 160; o2.beginPath(); o2.moveTo(x, y - 26); o2.quadraticCurveTo(x + 16, y, x, y + 8); o2.quadraticCurveTo(x - 16, y, x, y - 26); o2.fill(); } }; });
+// 7 grab the phone and send, as a joke
+shot(21.08, (t, lt) => { night(ROOM); youInBed(t > 23.3 ? 'smile' : 'neutral', { phone: true, t }); SHAKE = 0; if (t < 23.4) cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt); else { cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt); }
+  SH.ov = () => { if (t > 23.3) { o2.fillStyle = 'rgba(5,6,14,.6)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, eo(prog(t, 23.3, 23.6)) * 1.2); } }; });
+// 8 phone vibrates almost immediately: "Vai nada. Dorme."
+shot(26.89, (t, lt) => { night(ROOM, .8); SHAKE = (t > 27.3 && t < 28.0) || (t > 28.7 && t < 29.1) ? .05 : 0; youInBed('neutral', { phone: true, t }); cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.6)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2 + ((t > 27.3 && t < 28.0) ? Math.sin(t * 80) * 10 : 0), 800, 1.2); sfx('BZZ', 860, 360, (t - 27.37) / 1.0, .15); }; });
+// 9 you laugh quietly; she's pretending to sleep
+shot(30.17, (t, lt) => { night(ROOM); youInBed(Math.floor(t * 6) % 2 ? 'happy' : 'smile', { phone: true, t }); SHAKE = .015; cam(ROOM, [.9, 2.4, 2.2], [-1.1, 1.55, -1.85], 40, lt); SH.ov = () => whisper('hehe', 640, 760, prog(t, 30.5, 30.8), 50); });
+// 10 you look up; the sheet doesn't move
+shot(32.89, (t, lt) => { night(ROOM); youInBed('neutral', { hy: 0 }); SHAKE = 0; const k = eio(cl(lt / 2.5)); cam(ROOM, L3([1.2, 4.9, 2.4], [.4, 4.6, .9], k), [-1.0, 3.8, -2.0], 40, lt); });
+// 11 another message: "Did grandma lock the kitchen door?" — you find it odd — reply "dunno"
+shot(35.37, (t, lt) => { night(ROOM, .8); const odd = t > 38.4 && t < 41.1; youInBed(odd ? 'suspect' : 'neutral', { phone: !odd, t, hy: odd ? -.4 : 0 }); SHAKE = t > 35.4 && t < 35.9 ? .04 : 0;
+  if (odd) cam(ROOM, [.8, 2.3, 2.4], [-1.0, 1.5, -1.85], 34, lt - 3.03); else cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { if (!odd) { o2.fillStyle = 'rgba(5,6,14,.6)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, 1.2); } else whisper('?', 700, 640, prog(t, 38.7, 39.0), 120); }; });
+// 12 why? typing... "Because someone is walking in the corridor."
+shot(42.55, (t, lt) => { night(ROOM, .7); youInBed('worried', { phone: true, t }); SHAKE = t > 46.7 && t < 47.2 ? .06 : 0; cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.65)'; o2.fillRect(0, 0, W, H); const zoom = 1 + .12 * eio(prog(t, 46.7, 48.8)); chatUI(t, W / 2, 800, 1.2 * zoom); }; });
+// 13 you stop, listen
+shot(48.87, (t, lt) => { night(ROOM, .8); youInBed('shock', { hy: -.3, look: 1 }); SHAKE = 0; const k = eio(cl(lt / 1.4)); cam(ROOM, L3([1.0, 2.4, 2.6], [.2, 2.1, 1.0], k), [-1.3, 1.5, -1.85], 40, lt); });
+// 14 the fan creaks
+shot(50.31, (t, lt) => { night(ROOM, 1.6); FAN.userData.blades.rotation.y = t * 1.6; FAN.rotation.z = Math.sin(t * 1.6) * .05; SHAKE = .02; cam(ROOM, [.6, 4.0, 5.0], [-.4, 6.6, .8], 44, lt); SH.ov = () => sfx('nhééc', 700, 700, (t - 50.95) / 1.0, -.12); });
+// 15 the living-room clock strikes three
+shot(51.51, (t, lt) => { night(LIVR, .9); const pend = LIVR.userData.pend; pend.rotation.z = Math.sin(t * 3.2) * .25; SHAKE = 0; cam(LIVR, [1.2, 3.2, 3.6], [0, 3.2, -2.2], 40, lt);
+  SH.ov = () => { [52.39, 52.79, 53.03].forEach((tt, i) => sfx('DONG', 300 + i * 240, 420 + i * 40, (t - tt) / .9, -.1 + i * .08, '#ffc83d')); }; });
+// 16 a slipper shuffling slowly on the floor, getting closer
+shot(53.51, (t, lt) => { night(COR, 1.8); SLIP.visible = true; warm.intensity = 6; warm.position.set(...P(COR, 0, 4, -2)); const z = lerp(-10, 1.5, prog(t, 53.6, 58.2)); SLIP.position.set(0, 0, z); SLIP.children.forEach((g, i) => { const ph = Math.max(0, Math.sin(t * 2.4 + i * Math.PI)); g.position.z = ph * .5; });
+  SHAKE = 0; cam(COR, [.6, .55, 5], [0, .4, -6], 44, lt); SH.ov = () => { sfx('shhh...', 700, 760, ((t - 54.6) % 1.6) / 1.2, .08, '#c9d4ff'); whisper('CHEGANDO MAIS PERTO', W / 2, 330, prog(t, 57.19, 57.5), 46, '#ff6a5a'); }; });
+// 17 you type with a trembling finger
+shot(58.23, (t, lt) => { night(ROOM, .7); youInBed('worried', { phone: true, t, tremble: true }); SHAKE = .02; cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.65)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, 1.2, { tremble: true }); }; });
+// 18 you whisper her name. nothing. call again, louder
+shot(63.34, (t, lt) => { night(ROOM, .8); youInBed(t > 64.3 && t < 65.0 || t > 66.3 && t < 67.9 ? talk(t) : 'worried', { hy: -.2 }); SHAKE = 0; const k = eio(cl(lt / 4.8)); cam(ROOM, L3([1.0, 2.3, 2.8], [.4, 2.1, 1.4], k), [-1.4, 1.5, -1.85], 40, lt);
+  SH.ov = () => { whisper('Duda...', 640, 640, prog(t, 64.3, 64.6) * (1 - prog(t, 65.6, 65.8)), 52, 'rgba(255,255,255,.6)'); whisper('DUDA!', 640, 640, prog(t, 66.46, 66.7), 80, '#fff'); whisper('nada.', W / 2, 330, prog(t, 65.18, 65.4) * (1 - prog(t, 66.3, 66.4)), 52, '#9aa4b0'); }; });
+// 19 up there the sheet stays exactly the same; not even the breathing changes
+shot(68.22, (t, lt) => { night(ROOM, .75); SHAKE = 0; const k = eio(cl(lt / 4.2)); cam(ROOM, L3([1.4, 4.8, 2.6], [-.2, 4.4, .2], k), [-1.2, 3.85, -2.0], 38, lt); });
+// 20 the slipper stops right in front of your bedroom door
+shot(72.46, (t, lt) => { night(ROOM, .7); const G = ROOM; G.userData.doorLight.visible = false; warm.intensity = 0; SHAKE = t > 73.2 && t < 73.6 ? .05 : 0; cam(ROOM, [4.4, .8, 6.0], [5.2, .5, 1.6], 38, lt);
+  SH.ov = () => { o2.save(); const k = prog(t, 72.5, 73.2); o2.globalAlpha = .9; o2.fillStyle = '#ffc77a'; o2.fillRect(300, 1240, 520, 18); o2.fillStyle = '#0a0a14'; const sx = 470 + (1 - k) * 260; o2.fillRect(sx, 1240, 70, 18); o2.fillRect(sx + 110, 1240, 70, 18); o2.restore(); whisper('PAROU NA PORTA', W / 2, 330, prog(t, 73.18, 73.5), 50, '#ff6a5a'); }; });
+// 21 under her name in the chat: "typing..."
+shot(75.9, (t, lt) => { night(ROOM, .7); youInBed('shock', { phone: true, t }); SHAKE = 0; cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.65)'; o2.fillRect(0, 0, W, H); const z = 1 + .7 * eio(prog(t, 76.2, 77.6)) * (1 - prog(t, 78.6, 79.0)); chatUI(t, W / 2 + (z - 1) * 260, 800 + (z - 1) * 640, 1.2 * z); }; });
+// 22 you write: why don't you answer when I call you? — answer takes long
+shot(79.07, (t, lt) => { night(ROOM, .7); youInBed('worried', { phone: true, t, tremble: t > 82 }); SHAKE = 0; cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.65)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, 1.2, { tremble: t > 82 }); }; });
+// 23 the reply: I'm not in the room... it's me in the corridor
+shot(85.55, (t, lt) => { night(ROOM, .65); const face = t > 88.5; youInBed('shock', { phone: !face, t, hy: face ? -.5 : 0 }); SHAKE = t > 85.6 && t < 86.0 ? .06 : (face ? .03 : 0);
+  if (!face) cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt); else cam(ROOM, [.5, 2.1, 1.2], [-1.1, 1.5, -1.85], 30, lt - 2.95);
+  SH.ov = () => { if (!face) { o2.fillStyle = 'rgba(5,6,14,.65)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, 1.2 * (1 + .08 * eio(prog(t, 85.6, 88.4)))); } else { o2.fillStyle = 'rgba(120,0,0,.12)'; o2.fillRect(0, 0, W, H); whisper('SOU EU AQUI NO CORREDOR', W / 2, 330, prog(t, 88.5, 88.8), 46, '#ff6a5a'); } }; });
+// 24 you look at the top bunk: the sheet has the shape of someone lying, facing the wall
+shot(90.05, (t, lt) => { night(ROOM, .6); SHAKE = 0; const k = eio(cl(lt / 5.2)); cam(ROOM, L3([1.8, 5.2, 3.2], [-.3, 4.5, .1], k), [-1.2, 3.85, -2.0], 38, lt); SH.ov = () => { o2.fillStyle = `rgba(120,0,0,${.15 * prog(t, 91.5, 94)})`; o2.fillRect(0, 0, W, H); }; });
+// 25 phone vibrates one last time
+shot(95.25, (t, lt) => { night(ROOM, .65); youInBed('shock', { phone: true, t, tremble: true }); SHAKE = t < 96.2 ? .05 : .01; cam(ROOM, [1.4, 2.5, 3.4], [-.6, 1.6, -1.85], 42, lt);
+  SH.ov = () => { o2.fillStyle = 'rgba(5,6,14,.7)'; o2.fillRect(0, 0, W, H); chatUI(t, W / 2, 800, 1.2, { tremble: t < 96.8 }); }; });
+// 26 the doorknob turns; the door opens slowly
+shot(100.29, (t, lt) => { night(ROOM, .7); const G = ROOM; G.userData.knob.rotation.z = -eio(prog(t, 100.4, 101.1)) * .7; const op = eio(prog(t, 101.6, 103.2)); G.userData.door.rotation.y = op * 1.2; G.userData.doorLight.visible = true; warm.intensity = 5 * op; warm.position.set(...P(G, 5.2, 3, 3)); SHAKE = 0;
+  if (t < 101.6) cam(ROOM, [4.9, 2.3, 4.2], [5.95, 2.1, 1.7], 30, lt); else cam(ROOM, [1.0, 2.6, 6.5], [4.8, 2.2, 1.6], 40, lt - 1.31); });
+// 27 it's Duda in pajamas, in the corridor, looking at the top bunk, pale
+shot(103.25, (t, lt) => { night(ROOM, .7); const G = ROOM; G.userData.door.rotation.y = 1.2; G.userData.doorLight.visible = true; warm.intensity = 5; warm.position.set(...P(G, 5.2, 3, 3.5));
+  DUDA.visible = true; pose(DUDA, { pos: P(G, 5.2, 0, 2.4), ry: -.9, e: 'shock', hx: -.35, look: -1, aL: -.2, aR: -.2 }); DUDA.userData.parts.head.material.color.set(0xc4d0e6);
+  SHAKE = 0; const k = eio(cl(lt / 5)); if (t < 106) cam(ROOM, L3([2.6, 1.9, 7.6], [3.2, 2.1, 6.4], k), [5.2, 2.3, 2.4], 40, lt); else cam(ROOM, [3.3, 2.5, 5.6], [5.2, 2.6, 2.4], 34, lt - 2.75);
+  SH.ov = () => { o2.fillStyle = 'rgba(80,0,0,.1)'; o2.fillRect(0, 0, W, H); }; });
+// 28 and from up there, very softly, someone whispers your name
+shot(108.31, (t, lt) => { night(ROOM, .5); SHAKE = 0; const k = eio(cl(lt / 3.8)); const H_ = LUMP.userData.head; H_.rotation.y = -eio(prog(t, 109.4, 111.2)) * .5; LUMP.userData.eyes.visible = t > 110.3;
+  cam(ROOM, L3([1.2, 4.6, 2.2], [-1.6, 4.25, -.3], k), [-2.2, 3.85, -1.5], 36, lt);
+  SH.ov = () => { whisper('...psst...', W / 2, 700, prog(t, 110.6, 111.2) * (1 - prog(t, 111.9, 112.2)), 54, 'rgba(255,255,255,.55)'); if (t > 111.9) { o2.fillStyle = `rgba(0,0,0,${prog(t, 111.9, 112.4)})`; o2.fillRect(0, 0, W, H); } }; });
+
+// ---------- captions ----------
+let WORDS = [];
+const KEY = new Set(['três', 'manhã', 'prima', 'mensagem.', 'dormindo', 'cima', 'beliche,', 'avó,', 'interior.', 'ventilador', 'rangendo', 'baixo.', 'duda', 'parede,', 'lençol', 'cabeça.', 'calor,', 'dormir.', 'celular', 'acordada?', 'vibra', 'dorme.', 'fingindo', 'mexe.', 'trancou', 'cozinha?', 'estranha.', 'pontinhos', 'alguém', 'corredor.', 'escuta.', 'range.', 'relógio', 'vezes.', 'chinelo', 'perto.', 'tremendo.', 'graça.', 'brincando.', 'sussurra', 'nada.', 'alto.', 'igualzinho.', 'respiração', 'porta', 'quarto.', 'escrito.', 'chamo?', 'demora.', 'sofá', 'sala.', 'deitado,', 'última', 'ninguém', 'sabe.', 'maçaneta', 'devagar.', 'pijama.', 'pálida,', 'baixinho,', 'nome.']);
+let CH = [];
+function buildChunks() { let cur = []; const flush = () => { if (cur.length) CH.push(cur); cur = []; };
+  WORDS.forEach(w => { const txt = cur.map(x => x.w).join(' '); if (cur.length && (cur.length >= 3 || (txt + ' ' + w.w).length > 18 || w.s - cur[cur.length - 1].s > .9)) flush(); cur.push(w); if (/[.,!?:]$/.test(w.w)) flush(); }); flush();
+  CH.forEach((c, i) => { c.s = c[0].s; const nx = CH[i + 1]; c.e = Math.min(nx ? nx[0].s : 112.4, c[c.length - 1].s + 1.2); }); }
+function captions(t) {
+  if (t >= 112.4) return; const c = CH.find(c => t >= c.s - .02 && t < c.e); if (!c) return;
+  const k = c.s < .1 ? 1 : eback(prog(t, c.s - .02, c.s + .14)); const size = 80;
+  o2.font = `900 ${size}px Poppins`; const parts = c.map(w => ({ w: w.w.toUpperCase().replace(/[.,]$/, ''), key: KEY.has(w.w.toLowerCase()) }));
+  const sp = size * .28; const ws = parts.map(p => o2.measureText(p.w).width); const tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); const sc = Math.min(1, 960 / tot);
+  o2.save(); o2.translate(W / 2, 1730); o2.scale(k * sc, k * sc); let x = -tot / 2;
+  parts.forEach((p, i) => { const cx = x + ws[i] / 2; o2.save(); o2.shadowColor = 'rgba(0,0,0,.55)'; o2.shadowBlur = 18; o2.shadowOffsetY = 8; T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900, stroke: 16, sc: '#1b120c' }); o2.restore(); T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900 }); x += ws[i] + sp; });
+  o2.restore();
+}
+// ---------- end card ----------
+function endCard(t) {
+  const lt = t - 112.4; o2.fillStyle = '#1a120b'; o2.fillRect(0, 0, W, H);
+  o2.save(); o2.translate(W / 2, 520); const k = eback(cl(lt / .5)); o2.scale(k, k);
+  for (const [dx, a] of [[-70, 1], [70, .55]]) { o2.globalAlpha = a; o2.fillStyle = '#2E6E8E'; o2.beginPath(); o2.arc(dx, 0, 120, 0, 7); o2.fill(); o2.strokeStyle = '#F2C14E'; o2.lineWidth = 10; o2.stroke(); o2.lineWidth = 5; o2.beginPath(); o2.ellipse(dx, 0, 50, 120, 0, 0, 7); o2.moveTo(dx - 120, 0); o2.lineTo(dx + 120, 0); o2.stroke(); }
+  o2.restore(); o2.globalAlpha = 1;
+  T('MUNDO PARALELO', W / 2, 760, 104 * eback(cl((lt - .15) / .4)), '#fff', { w: 900 });
+  o2.fillStyle = '#F2C14E'; const lw = 520 * eo(cl((lt - .35) / .4)); o2.fillRect(W / 2 - lw / 2, 832, lw, 8);
+  T('VOCÊ OLHARIA PRA CIMA?', W / 2, 910, 50, '#F2C14E', { w: 800 });
+  const pk = (1 + .08 * Math.sin(t * 8)) * eback(cl((lt - .8) / .35)); o2.save(); o2.translate(W / 2, 1500); o2.scale(pk, pk); o2.fillStyle = '#C0392B'; rr(o2, -340, -70, 680, 140, 70); o2.fill(); o2.fillStyle = '#fff'; o2.beginPath(); o2.moveTo(-270, -32); o2.lineTo(-270, 32); o2.lineTo(-215, 0); o2.closePath(); o2.fill(); T('SIGA O CANAL', 35, 4, 54, '#fff', { w: 900 }); o2.restore();
+  o2.fillStyle = `rgba(0,0,0,${cl((t - 116.5) / .5)})`; o2.fillRect(0, 0, W, H);
+}
+// ---------- grain ----------
+const grainC = document.createElement('canvas'); grainC.width = 540; grainC.height = 960; const gx = grainC.getContext('2d'); const gid = gx.createImageData(540, 960);
+function grain(seed) { let s = (seed * 9301 + 49297) % 233280; for (let i = 0; i < gid.data.length; i += 4) { s = (s * 9301 + 49297) % 233280; const v = s / 233280 * 255; gid.data[i] = gid.data[i + 1] = gid.data[i + 2] = v; gid.data[i + 3] = 20; } gx.putImageData(gid, 0, 0); }
+
+
+window.renderFrame = (t) => {
+  if (t >= 112.4) { endCard(t); return out.toDataURL('image/jpeg', .9); }
+  hideAll(); SH.ov = null; SHAKE = 0; PH.visible = false; phoneGlow.intensity = 0; LUMP.userData.eyes.visible = false; LUMP.userData.head.rotation.y = 0; ROOM.userData.door.rotation.y = 0; ROOM.userData.knob.rotation.z = 0; ROOM.userData.doorLight.visible = false; DUDA.userData.parts.head.material.color.set(0xffffff);
+  FAN.userData.blades.rotation.y = t * 1.6;
+  const s = SH.filter(s => t >= s.t0).pop(); const lt = t - s.t0; s.fn(t, lt);
+  renderer.render(scene, camera);
+  o2.globalAlpha = 1; o2.filter = (lt < .1 && s.t0 > 0 ? `blur(${(1 - lt / .1) * 6}px) ` : '') + 'saturate(.9) contrast(1.06)'; o2.drawImage(renderer.domElement, 0, 0); o2.filter = 'none';
+  if (SH.ov) { o2.save(); SH.ov(); o2.restore(); }
+  const v = o2.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, H * .75); v.addColorStop(0, 'rgba(0,0,10,0)'); v.addColorStop(1, 'rgba(0,0,10,.6)'); o2.fillStyle = v; o2.fillRect(0, 0, W, H);
+  grain(Math.floor(t * 30)); o2.drawImage(grainC, 0, 0, W, H);
+  clockTag(t);
+  captions(t);
+  return out.toDataURL('image/jpeg', .9);
+};
+window.setWords = (w) => { WORDS = w; CH = []; buildChunks(); };
+await document.fonts.load('900 80px Poppins'); await document.fonts.load('800 40px Poppins'); await document.fonts.load('600 40px Poppins');
+window.ready = true;
+</script></body></html>
