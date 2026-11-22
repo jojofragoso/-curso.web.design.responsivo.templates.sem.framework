@@ -272,13 +272,13 @@ shot(45.9, (t, lt) => { moodSq('sunset'); setClock(6, 0); statues('neutral', 0);
   SHAKE = 0; cam([0, 4.4, -1.8], [0, 1.6, 5], 42, lt); SH.ov = () => pillTag('TERÇA', W / 2, 400, prog(t, 46.62, 46.9)); });
 // 11 she looked up, a bit embarrassed: "Hi, I know it's weird, but I needed to talk to someone."
 shot(51.45, (t, lt) => { moodSq('sunset'); statues('neutral', 0); girlBench(GIRL, t > 54 && t < 58.4 ? talk(t) : 'smile', { hx: -.3 }); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1);
-  SHAKE = 0; const k = eio(cl(lt / 7)); cam(L3([-1.4, 3.4, -.4], [-.8, 3.1, .8], k), [.4, 2.2, 4.95], 40, lt);
+  SHAKE = 0; const k = eio(cl(lt / 7)); cam(L3([0, 4.4, -1.2], [.1, 4.0, -.2], k), [.4, 2.2, 4.95], 40, lt);
   SH.ov = () => { speech('Oi... eu sei\nque é estranho...', .4, 3.4, 4.95, prog(t, 54.73, 55.0) * (1 - prog(t, 56.7, 56.8))); speech('...mas eu precisava\nfalar com alguém.', .4, 3.4, 4.95, prog(t, 56.81, 57.1)); }; });
 // 12 she came back the next day and the next, always at six, after work
 shot(58.81, (t, lt) => { moodSq('sunset'); const d = Math.min(4, 2 + Math.floor((t - 58.81) / 1.5)); setClock(6, 0); statues('smile', 0); girlBench(GIRL, blinkE(t, 'smile'), { hx: -.25, x: .4 - (d % 2) * .3 }); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1);
   SHAKE = 0; cam([2.2, 4.4, 8.8], [3.0, 3.9, 1.0], 40, lt); SH.ov = () => { counter('18:00', W / 2, 300, prog(t, 61.29, 61.6), 150); pillTag('DIA ' + d, W / 2, 440, prog(t, 58.9, 59.2), '#fff', '#5a5a5a'); }; });
 // 13 she talked about her boss, her dog Picoca that ate socks, her fear of elevators
-shot(63.45, (t, lt) => { moodSq('sunset'); statues('smile', 0); girlBench(GIRL, talk(t), { hx: -.25, aR: -1.0 }); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1); SHAKE = 0; cam([-1.6, 3.3, -.2], [.4, 2.2, 4.95], 40, lt);
+shot(63.45, (t, lt) => { moodSq('sunset'); statues('smile', 0); girlBench(GIRL, talk(t), { hx: -.25, aR: -1.0 }); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1); SHAKE = 0; cam([.1, 4.2, -.6], [.4, 2.2, 4.95], 40, lt);
   SH.ov = () => { const which = t < 65.5 ? 0 : t < 68.06 ? 1 : 2; think(() => { if (which === 0) { T('CHEFE', 0, -60, 40, '#c0392b', { w: 900 }); T('😠', 0, 10, 1, '#fff'); o2.fillStyle = '#c0392b'; o2.beginPath(); o2.arc(0, 30, 40, 0, 7); o2.fill(); T('!!', 0, 32, 50, '#fff', { w: 900 }); } else if (which === 1) { T('PICOCA', 0, -70, 40, '#8a5a33', { w: 900 }); o2.fillStyle = '#d9a86a'; o2.beginPath(); o2.ellipse(-10, 20, 70, 40, 0, 0, 7); o2.fill(); o2.beginPath(); o2.arc(60, -5, 32, 0, 7); o2.fill(); o2.fillStyle = '#e8e2f0'; rr(o2, 80, 0, 40, 26, 8); o2.fill(); } else { T('ELEVADOR', 0, -70, 40, '#2b4c9b', { w: 900 }); o2.strokeStyle = '#2b4c9b'; o2.lineWidth = 8; o2.strokeRect(-45, -30, 90, 110); o2.beginPath(); o2.moveTo(0, -30); o2.lineTo(0, 80); o2.stroke(); T('😰', 0, 0, 1, '#fff'); } }, .4, 3.6, 4.95, prog(t, 63.5, 63.8) + (t > 65.5 && t < 65.7 ? 0 : 0)); }; });
 // 14 sometimes she read a book aloud; sometimes just silence, looking up
 shot(69.74, (t, lt) => { moodSq('sunset'); statues(blinkE(t, 'smile'), 0); const read = t < 71.9; girlBench(GIRL, read ? talk(t) : 'neutral', { hx: read ? .45 : -.45, aL: read ? -1.1 : 0, aR: read ? -1.1 : 0, aLz: read ? -.25 : 0, aRz: read ? -.25 : 0 }); BOOK.visible = read; BOOK.position.set(.4, 1.95, 4.35); BOOK.rotation.set(-.6, 0, 0); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1);
@@ -295,7 +295,7 @@ shot(83.43, (t, lt) => { const rain = t > 85.4; moodSq(rain ? 'rain' : 'sunset')
   SH.ov = () => { if (rain) { rainOv(t); pillTag('O PIOR DIA DA SEMANA', W / 2, 400, prog(t, 87.43, 87.7), '#fff', '#5a6a7a'); } else counter('ATÉ AS SEIS', W / 2, 300, prog(t, 83.9, 84.2), 120); }; });
 // 18 Sunday: swollen eye: "seven days from now it's a year I'm alone"
 shot(88.71, (t, lt) => { moodSq('sunset'); statues('sad', 0); SCARF.visible = true; SCARF.position.set(0, 2.45, -.3); girlBench(GIRL, t > 92 && t < 94.4 ? (Math.floor(t * 8) % 2 ? 'cry' : 'sad') : 'cry', { hx: -.3, aL: t < 91.5 ? -2.3 : 0, aLz: -.25 }); BAG.visible = true; BAG.position.set(1.4, 1.3, 5.1);
-  SHAKE = 0; cam([-.8, 3.2, .2], [.4, 2.3, 4.95], 38, lt); SH.ov = () => { pillTag('DOMINGO', W / 2, 400, prog(t, 88.95, 89.2)); speech('Daqui a sete dias faz um\nano que eu tô sozinha.', .4, 3.3, 4.95, prog(t, 92.07, 92.35)); }; });
+  SHAKE = 0; cam([0, 4.0, -.2], [.4, 2.3, 4.95], 38, lt); SH.ov = () => { pillTag('DOMINGO', W / 2, 400, prog(t, 88.95, 89.2)); speech('Daqui a sete dias faz um\nano que eu tô sozinha.', .4, 3.3, 4.95, prog(t, 92.07, 92.35)); }; });
 // 19 I wanted to shout, get down and hold her hand (daydream)
 shot(94.87, (t, lt) => { const dream = t > 96.2; moodSq(dream ? 'dream' : 'sunset'); SCARF.visible = true; SCARF.position.set(0, 2.45, -.3);
   if (!dream) { statues('worried', 0, { noTi: true }); SHAKE = .03; cam([-1.4, 3.95, 2.8], [-1.4, 3.92, 0], 36, lt); }
@@ -314,7 +314,7 @@ shot(105.55, (t, lt) => { moodSq(t > 108 ? 'night' : 'sunset'); statues('sad', 0
 shot(113.55, (t, lt) => { moodSq('night'); statues('sad', Math.sin(t * .6)); SCARF.visible = true; SCARF.position.set(0, 2.45, -.3); SHAKE = 0; const k = eio(cl(lt / 4.5)); cam(L3([-3.8, 5.8, -1.8], [-3.6, 5.5, -1.4], k), [.5, .8, 6], 42, lt); SH.ov = () => pillTag('FALTA 1 DIA', W / 2, 400, prog(t, 113.6, 113.9)); });
 // 23 the seventh day: she came early, in a dress, hair done; "I'm ashamed I never had the courage before."
 shot(118.03, (t, lt) => { moodSq('day'); setClock(4, 30); statues(t > 125 ? 'smile' : 'neutral', 0); SCARF.visible = true; SCARF.position.set(0, 2.45, -.3); const walkIn = prog(t, 119.0, 122.3); if (t < 122.4) pose(GIRL2, { pos: [lerp(6, .4, walkIn), 0, 4.6], ry: -Math.PI / 2, walk: t * 6, e: 'smile' }); else girlBench(GIRL2, t > 125.6 && t < 128.2 ? talk(t) : 'neutral', { hx: -.3, aL: -.2, aR: -.2 });
-  SHAKE = 0; if (t < 122.4) cam([0, 4.4, -1.8], [0, 1.6, 5], 42, lt); else cam([-1.4, 3.4, -.4], [.4, 2.2, 4.95], 40, lt - 4.37);
+  SHAKE = 0; if (t < 122.4) cam([0, 4.4, -1.8], [0, 1.6, 5], 42, lt); else cam([.1, 4.2, -.6], [.4, 2.2, 4.95], 40, lt - 4.37);
   SH.ov = () => { pillTag('7º DIA', W / 2, 400, prog(t, 118.19, 118.5)); speech('Eu tenho vergonha de nunca\nter tido coragem antes.', .4, 3.4, 4.95, prog(t, 125.63, 125.9)); }; });
 // 24 she got up, climbed the pedestal, came close (POV from the narrator)
 shot(128.67, (t, lt) => { moodSq('day'); statues('smile', 1); SCARF.visible = true; SCARF.position.set(0, 2.45, -.3); const p = prog(t, 128.9, 130.6); const onPed = p > .75; pose(GIRL2, { pos: [lerp(.4, .65, p), onPed ? STAND_Y : lerp(0, 0, p), lerp(4.6, .7, p)], ry: Math.PI + .5 * p, walk: p < .75 ? t * 6 : null, e: 'smile', hx: -.2 });
