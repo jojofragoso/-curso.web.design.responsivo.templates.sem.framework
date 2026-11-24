@@ -1,0 +1,279 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:P;src:url(Poppins-SemiBold.ttf);font-weight:600}
+@font-face{font-family:P;src:url(Poppins-Bold.ttf);font-weight:700}
+@font-face{font-family:P;src:url(Poppins-ExtraBold.ttf);font-weight:800}
+@font-face{font-family:P;src:url(Poppins-Black.ttf);font-weight:900}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:720px;height:1280px;overflow:hidden;background:#cfe7df;font-family:P,sans-serif}
+#stage{position:absolute;inset:0;overflow:hidden}
+.flat{position:absolute;inset:0;background:#cfe7df}
+.blob{position:absolute;border-radius:50%;background:#bcdcd1}
+.phone{position:absolute;left:110px;top:150px;width:500px;height:1000px;background:#fff;border-radius:58px;border:12px solid #2b211d;overflow:hidden;box-shadow:12px 14px 0 rgba(43,33,29,.18);transform-origin:50% 50%}
+.notch{position:absolute;left:50%;top:10px;width:120px;height:30px;margin-left:-60px;background:#2b211d;border-radius:20px;z-index:5}
+.sbar{height:52px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 34px 4px;font-weight:700;font-size:17px;color:#111}
+.ighead{display:flex;align-items:center;gap:12px;padding:14px 18px;font-weight:700;font-size:19px;color:#111}
+.av{width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid #e1306c;flex:none;background:#ffa66b}
+.av svg{width:100%;height:100%;transform:scale(1.9) translate(4%,8%)}
+.post{width:100%;height:476px;position:relative;overflow:hidden}
+.icons{display:flex;gap:20px;padding:14px 18px 6px;align-items:center}
+.likes{padding:2px 18px;font-weight:700;font-size:18px;color:#111}
+.cap{padding:4px 18px;font-size:17px;color:#111;font-weight:600}
+.cap span{font-weight:400}
+.date{padding:8px 18px;font-size:16px;color:#888;font-weight:600;display:inline-block;margin-left:10px;border-radius:10px}
+.chathead{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #eee;font-weight:700;font-size:19px;color:#111}
+.chathead small{display:block;font-weight:600;font-size:13px;color:#2bb24c}
+.msgs{position:absolute;left:0;right:0;top:118px;bottom:300px;padding:16px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px}
+.m{max-width:80%;padding:14px 20px;border-radius:24px;font-size:25px;font-weight:600;line-height:1.3}
+.m.in{align-self:flex-start;background:#efefef;color:#111;border-bottom-left-radius:6px}
+.m.out{align-self:flex-end;background:#3797f0;color:#fff;border-bottom-right-radius:6px}
+.tstamp{align-self:center;font-size:16px;color:#999;font-weight:600}
+.input{position:absolute;left:14px;right:14px;bottom:18px;height:52px;border-radius:26px;background:#f1f1f1;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 22px;color:#999;font-size:17px;font-weight:600}
+.send{width:38px;height:38px;border-radius:50%;background:#3797f0}
+.q{display:flex;align-items:center;justify-content:center;border-radius:50%;background:#ffd23f;border:8px solid #fff;color:#1b1b1b;font-weight:900}
+.badge{background:#2b211d;border:4px solid #fff;border-radius:14px;color:#fff;text-align:center;font-weight:800}
+</style></head>
+<body><div id="stage"></div>
+<script src="chars.js"></script>
+<script>
+const Sg=document.getElementById('stage');
+const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>{x=cl(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2};
+const pop=x=>{x=cl(x);const c=1.70158;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const lerp=(a,b,k)=>a+(b-a)*k;
+const svg=(inner)=>`<svg width="720" height="1280" viewBox="0 0 720 1280" style="position:absolute;left:0;top:0">${inner}</svg>`;
+const cam=(inner,z,cx,cy,sx=0,sy=0)=>`<g transform="translate(${360+sx} ${640+sy}) scale(${z}) translate(${-cx} ${-cy})">${inner}</g>`;
+const BIA=biaPortrait(476);
+const BIA_AV=biaPortrait(42);
+
+// ---------- CENÁRIOS ----------
+function room(mode){
+  const night=mode==='night', sun=mode==='sun';
+  const wall=night?'#34466e':'#f2cfa3', wall2=night?'#2d3d61':'#e8bf8f', floor=night?'#6b4a3a':'#b37a4e', plank=night?'#5a3d30':'#9c673f';
+  let s=`<rect width="720" height="1280" fill="${wall}"/>`;
+  for(let i=0;i<8;i++) s+=`<rect x="${i*96}" y="0" width="48" height="900" fill="${wall2}" opacity=".5"/>`;
+  s+=`<rect x="0" y="880" width="720" height="1400" fill="${floor}"/><path d="M0 880 H720" stroke="${OL}" stroke-width="8"/>`;
+  for(let i=1;i<20;i++) s+=`<path d="M0 ${880+i*70} H720" stroke="${plank}" stroke-width="5"/>`;
+  // janela
+  const sky=night?'#1c2747':'#ffb877';
+  s+=`<rect x="420" y="170" width="220" height="250" rx="6" ${st(sky)}/>`;
+  if(night) s+=`<circle cx="575" cy="235" r="30" fill="#f6e9b0"/><circle cx="560" cy="228" r="26" fill="${sky}"/>`;
+  else s+=`<circle cx="530" cy="380" r="46" fill="#ffe08a"/><rect x="424" y="340" width="212" height="76" fill="#ff9b6b" opacity=".6"/>`;
+  s+=`<path d="M530 170 V420 M420 295 H640" stroke="${OL}" stroke-width="8"/>`;
+  s+=`<path d="M400 160 Q420 300 410 440 L440 440 Q450 300 430 160Z" ${st('#c9524a',6)}/><path d="M660 160 Q640 300 650 440 L620 440 Q610 300 630 160Z" ${st('#c9524a',6)}/>`;
+  // pôster
+  s+=`<rect x="70" y="200" width="150" height="200" rx="4" ${st('#f6d14a',6)}/><circle cx="145" cy="290" r="38" fill="#e2553f"/><path d="M90 380 L145 320 L200 380Z" fill="#2b4a7a"/>`;
+  return s;
+}
+function bed(night){
+  return `<rect x="40" y="700" width="560" height="60" rx="14" ${st('#8a5a3c')}/>
+  <rect x="40" y="560" width="70" height="320" rx="12" ${st('#8a5a3c')}/>
+  <rect x="80" y="740" width="520" height="140" rx="16" ${st(night?'#5876b8':'#7fa3d9')}/>
+  <ellipse cx="190" cy="700" rx="110" ry="46" ${st('#f4f1ea')}/>`;
+}
+function props(){
+  return `<g transform="translate(470 1050) rotate(-8)"><rect x="-80" y="-14" width="160" height="28" ${st('#e9c07a',6)}/><circle cx="0" cy="0" r="8" fill="#d0533f"/></g>
+  <ellipse cx="200" cy="1110" rx="150" ry="40" ${st('#b8463f',6)}/><ellipse cx="200" cy="1110" rx="110" ry="26" fill="none" stroke="#f0d6a0" stroke-width="5" stroke-dasharray="14 10"/>
+  <g transform="translate(110 1000) rotate(14)"><rect x="-40" y="-12" width="80" height="24" rx="10" ${st('#5a7a5a',5)}/></g>`;
+}
+function bathroom(){
+  let s=`<rect width="720" height="1280" fill="#bfe3d6"/>`;
+  for(let x=0;x<720;x+=60) s+=`<path d="M${x} 0 V1280" stroke="#a6cfc2" stroke-width="4"/>`;
+  for(let y=0;y<1280;y+=60) s+=`<path d="M0 ${y} H720" stroke="#a6cfc2" stroke-width="4"/>`;
+  s+=`<rect x="80" y="980" width="560" height="300" ${st('#eef2f2')}/><rect x="300" y="960" width="120" height="26" rx="8" ${st('#d9dfe0',6)}/>`;
+  return s;
+}
+function living(){
+  let s=`<rect width="720" height="1280" fill="#e7c49c"/><rect x="0" y="0" width="720" height="560" fill="#ddb88e" opacity=".6"/>`;
+  s+=`<rect x="0" y="930" width="720" height="1200" fill="#a8744c"/><path d="M0 930 H720" stroke="${OL}" stroke-width="8"/>`;
+  s+=`<rect x="70" y="200" width="120" height="150" ${st('#f6efe2',6)}/><circle cx="130" cy="260" r="30" fill="#c9a37a"/>`;
+  s+=`<rect x="520" y="230" width="110" height="130" ${st('#f6efe2',6)}/><rect x="545" y="260" width="60" height="60" fill="#8fb8a0"/>`;
+  s+=`<path d="M620 930 L640 820 L680 820 L700 930Z" ${st('#c26a3e',6)}/><g ${st('#4f9a5e',5)}><path d="M660 820 q-50 -60 -30 -120 q20 60 30 120z"/><path d="M660 820 q40 -80 70 -90 q-30 50 -70 90z"/></g>`;
+  return s;
+}
+function rays(c1,c2,t){
+  let s=`<rect width="720" height="1280" fill="${c1}"/>`;
+  for(let i=0;i<16;i++){const a=i*22.5+t*12;s+=`<path d="M360 640 L${360+1400*Math.cos(R(a))} ${640+1400*Math.sin(R(a))} L${360+1400*Math.cos(R(a+11))} ${640+1400*Math.sin(R(a+11))}Z" fill="${c2}"/>`;}
+  return s;
+}
+function flash(t,at){const d=t-at; if(d<0||d>0.35) return ''; return `<rect width="720" height="1280" fill="#fff" opacity="${0.85*(1-d/0.35)}"/>`;}
+function sparkle(x,y,k){if(k<=0||k>=1)return '';const r=10+30*Math.sin(k*Math.PI);return `<path d="M${x} ${y-r} L${x+r*.25} ${y-r*.25} L${x+r} ${y} L${x+r*.25} ${y+r*.25} L${x} ${y+r} L${x-r*.25} ${y+r*.25} L${x-r} ${y} L${x-r*.25} ${y-r*.25}Z" fill="#fff" stroke="${OL}" stroke-width="4"/>`;}
+const blinkAt=(t,list)=>list.some(b=>t>b&&t<b+0.12);
+
+// ---------- ELEMENTOS DAS TELAS DE CELULAR ----------
+const heart=(fill)=>`<svg width="36" height="34" viewBox="0 0 24 22"><path d="M12 21s-8.5-5.3-10.6-10.2C-.1 6.7 2.6 2 6.9 2c2.3 0 3.9 1.3 5.1 3 1.2-1.7 2.8-3 5.1-3 4.3 0 7 4.7 5.5 8.8C20.5 15.7 12 21 12 21z" fill="${fill?'#ed2b4a':'none'}" stroke="${fill?'#ed2b4a':'#111'}" stroke-width="2"/></svg>`;
+const ic=(d)=>`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linejoin="round">${d}</svg>`;
+const bubble=ic('<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-5A8.5 8.5 0 1 1 21 11.5z"/>');
+const plane=ic('<path d="M22 3L9.5 13.5M22 3l-7 19-5.5-8.5L1 9z"/>');
+const bg=()=>`<div class="flat"></div><div class="blob" style="width:700px;height:700px;left:380px;top:700px"></div><div class="blob" style="width:420px;height:420px;left:-200px;top:-120px"></div>`;
+// dedo desenhado no mesmo estilo
+const finger=(x,y)=>`<svg width="90" height="340" viewBox="0 0 90 340" style="position:absolute;left:${x-10}px;top:${y}px;z-index:9"><rect x="10" y="4" width="70" height="330" rx="35" ${st(C.skin,6)}/><rect x="24" y="16" width="42" height="46" rx="16" fill="#f8d7bd" stroke="${OL}" stroke-width="4"/></svg>`;
+
+const scenes={
+// 1) madrugada, deitado com o celular
+cama(t){
+  const wide=t>1.0;
+  const glow=`<path d="M300 560 L120 760 L420 760Z" fill="#9fd2ff" opacity=".25"/>`;
+  const head=`<g transform="translate(200 640) scale(.78)">${claudioHead({eyes:wide?'wide':'sleepy',mouth:wide?'o':'flat',lookX:.6,lookY:-.4,blink:blinkAt(t,[.5])})}</g>`;
+  const armPhone=`<g transform="translate(330 760)"><path d="M-80 0 Q-20 -40 0 -150" stroke="${OL}" stroke-width="48" fill="none" stroke-linecap="round"/><path d="M-80 0 Q-20 -40 0 -150" stroke="${C.skin}" stroke-width="34" fill="none" stroke-linecap="round"/><rect x="-26" y="-250" width="56" height="96" rx="10" ${st('#1b1b22',6)}/><rect x="-18" y="-240" width="40" height="74" rx="5" fill="#8fd0ff"/><circle cx="0" cy="-150" r="24" ${st(C.skin,6)}/></g>`;
+  const z=1.05+0.08*ease(t/1.3);
+  return svg(cam(room('night')+bed(true)+head+`<path d="M110 760 Q350 720 600 760 L600 880 L80 880Z" ${st('#5876b8')}/>`+glow+armPhone,z,330,680));
+},
+// 2) Instagram
+insta(t){
+  const E=window.E||{like:.75,zin:2.4,zout:5.6,unlike:6.9};const liked = t>E.like && t<E.unlike+0.15;
+  const z = t<E.zin?1: 1+0.75*ease((t-E.zin)/0.6) - (t>E.zout? 0.75*ease((t-E.zout)/0.6):0);
+  const oy = t<E.zin?0: -330*ease((t-E.zin)/0.6) + (t>E.zout? 330*ease((t-E.zout)/0.6):0);
+  const hl = t>E.zin+0.6 && t<E.zout;
+  let fy=1400;
+  const tap=(c)=>{const d=t-c; if(d<-0.6||d>0.5) return null; return d<0? 1400-(1400-842)*ease((d+0.6)/0.55) : 842+40*Math.sin(cl(d/0.12)*Math.PI)+ (d>0.2? (d-0.2)/0.3*560:0)};
+  const a=tap(E.like-0.05), b=tap(E.unlike-0.05); if(a!==null) fy=a; if(b!==null) fy=b;
+  const hs = liked? 1+0.35*Math.sin(cl((t-E.like)/0.3)*Math.PI):1;
+  return bg()+`<div class="phone" style="transform-origin:12% 80%;transform:translate(${-oy*0.35}px,${oy*0.6}px) scale(${z})"><div class="notch"></div>
+  <div class="sbar"><span>3:12</span><span>▮▮ ◔</span></div>
+  <div style="text-align:center;font-weight:800;font-size:19px;padding:4px 0 2px">Publicações</div>
+  <div class="ighead"><div class="av">${BIA_AV}</div><div>bia.moura<div style="font-size:13px;font-weight:600;color:#666">Arraial do Cabo, RJ</div></div></div>
+  <div class="post">${BIA}</div>
+  <div class="icons"><span style="display:inline-block;transform:scale(${hs})">${heart(liked)}</span>${bubble}${plane}</div>
+  <div class="likes">${liked?88:87} curtidas</div>
+  <div class="cap">bia.moura <span>fase franja, nunca mais 🙈</span></div>
+  <div class="cap" style="color:#888;font-weight:600">Ver todos os 12 comentários</div>
+  <div class="date" style="${hl?'background:#ffd23f;color:#111;font-size:22px;transform:scale(1.15);transform-origin:left':''}">14 de março de 2019</div>
+  </div>${finger(126,fy)}`;
+},
+// 3) "Tarde demais" — susto
+panic(t){
+  const sx=9*Math.sin(t*55), sy=7*Math.cos(t*47), z=2.2+0.4*ease(t/1.4);
+  const head=`<g transform="translate(360 640)">${claudioHead({eyes:'wide',mouth:'o',sweat:t,brow:1.2})}</g>`;
+  return svg(rays('#c8333f','#b02734',t)+cam(head,z,360,650,sx,sy)+`<rect width="720" height="1280" fill="none" stroke="#7a0f1a" stroke-width="120" opacity="${0.35+0.2*Math.sin(t*12)}"/>`);
+},
+chat(t, msgs, time, extra=''){
+  let h='';
+  for(const m of msgs){ if(t<m.at) continue; const p=pop((t-m.at)/0.3);
+    h+= m.ts? `<div class="tstamp" style="opacity:${cl((t-m.at)/0.2)}">${m.ts}</div>` : `<div class="m ${m.o?'out':'in'}" style="transform:scale(${p});transform-origin:${m.o?'right':'left'} bottom">${m.x}</div>`;}
+  return bg()+`<div class="phone" style="transform:scale(1.12)"><div class="notch"></div><div class="sbar"><span>${time}</span><span>▮▮ ◔</span></div>
+  <div class="chathead"><span style="font-size:28px">‹</span><div class="av">${BIA_AV}</div><div>bia.moura<small>online</small></div></div>
+  <div class="msgs">${h}</div><div class="input">Mensagem...<div class="send"></div></div></div>${extra}`;
+},
+chat1(t){const E=window.E||{m1:3.3,m2:4.5};return scenes.chat(t,[
+  {ts:'Última conversa: 2016',at:0.1},
+  {x:'parabéns pela formatura!! 🎓',at:0.2},
+  {x:'valeu! boa sorte aí',o:1,at:0.35},
+  {ts:'Hoje 3:13',at:E.m1-0.1},
+  {x:'mals, curti sem querer 😅',o:1,at:E.m1},
+  {x:'kkkkkk relaxa',at:E.m2},
+  {x:'cláudio?? da escola??',at:E.m2+0.6}],'3:14');},
+// 5) dança ao amanhecer
+danca(t){
+  const b=Math.sin(t*9), b2=Math.sin(t*9+Math.PI);
+  const c=claudio({x:360+30*Math.sin(t*4.5),y:1140,s:1.05,bob:14*Math.abs(b),lean:5*b,armL:60+70*(b*.5+.5),armR:40+90*(b2*.5+.5),holdR:'phone',legL:12*(b>0?b:0),legR:12*(b2>0?b2:0),tilt:8*b,head:{eyes:'squint',mouth:'grin',flush:1}});
+  let notes='';for(let i=0;i<3;i++){const k=((t*0.8+i/3)%1);notes+=`<text x="${520+40*Math.sin(i*2+t*3)}" y="${600-260*k}" font-size="56" fill="${OL}" opacity="${1-k}">♪</text>`;}
+  return svg(room('sun')+props()+c+notes);
+},
+chat2(t){const E=window.E||{m1:1.3};return scenes.chat(t,[
+  {x:'lembra da prova de física? kkk',at:0},
+  {x:'até hoje tenho trauma',o:1,at:0},
+  {x:'kkkkkkkkk',at:0},
+  {ts:'6:41',at:0},
+  {x:'seu perfil não tem nenhuma foto sua',at:0.4},
+  {x:'me manda uma? 👀',at:E.m1}],'6:41');},
+// 7) "Esse é o Cláudio": rosto -> chinelo -> calça furada
+revela(t){
+  const E=window.E||{feet:1.4,knee:2.8};
+  const c=claudio({x:360,y:1180,s:1,armL:6,armR:6,head:{eyes:'open',mouth:'grin',blink:blinkAt(t,[.8])}});
+  // posições de câmera: rosto (y=680), pés (y=1160), joelho (y=1020)
+  let cy=680,z=2.0;
+  if(t>E.feet-0.3){const k=ease((t-E.feet+0.3)/0.5);cy=lerp(680,1120,k);z=lerp(2.0,2.4,k);}
+  if(t>E.knee-0.3){const k=ease((t-E.knee+0.3)/0.4);cy=lerp(1120,1060,k);z=lerp(2.4,2.6,k);}
+  const ring=t>E.knee?`<circle cx="326" cy="1067" r="${34+4*Math.sin(t*8)}" fill="none" stroke="#e8202f" stroke-width="6"/>`:'';
+  return svg(cam(room('sun')+props()+c+ring,z,360,cy));
+},
+// 8) sorriso sem dente e o boné
+dente(t){
+  const E=window.E||{cap:4.5};
+  const up=t>E.cap-0.3?ease((t-E.cap+0.3)/0.35):0, back=t>E.cap+0.9?ease((t-E.cap-0.9)/0.4):0;
+  const c=claudio({x:360,y:1180,s:1,armL:6,armR:6+168*(up-back),armRFront:true,head:{eyes:'squint',mouth:'grin',flush:1}});
+  const z=2.6+0.25*ease(t/3);
+  return svg(cam(room('sun')+c+sparkle(340,745,(t-0.3)/0.6)+sparkle(400,720,(t-0.55)/0.6),z,360,700));
+},
+// 9) selfies no banheiro
+selfie(t){
+  const E=window.E||{f1:0.5,f2:1.6};
+  const pose=t<E.f1+0.1?'duck':t<E.f2+0.1?'serious':'sad';
+  const head={duck:{eyes:'squint',mouth:'duck'},serious:{eyes:'open',mouth:'flat',brow:-0.6},sad:{eyes:'sleepy',mouth:'grimace',brow:1}}[pose];
+  const c=claudio({x:330,y:1560,s:1.7,armL:pose==='serious'?30:8,holdL:pose==='serious'?'thumb':null,armR:150,holdR:'phone',armRFront:true,head});
+  return svg(bathroom()+c+flash(t,E.f1)+flash(t,E.f2));
+},
+// 10) dona Neide tirando a foto
+neidecena(t){
+  const E=window.E||{f1:1.5};
+  const c=claudio({x:470,y:1180,s:.95,armL:4,armR:4,head:{eyes:'wide',mouth:'grin',brow:-0.3}});
+  const n=neide({x:170,y:1200,s:.9,phoneUp:1,frown:t>E.f1+0.4,look:.6});
+  return svg(cam(living()+c+n+flash(t,E.f1),1.35,330,790));
+},
+gallery(t){
+  let cells=''; for(let i=0;i<15;i++){const isQ=i==7; const c=['#7a6a8a','#b88a5e','#8aa0a8','#5e7a6a','#c9a27a'][i%5];
+    cells+=`<div style="height:150px;background:${isQ?'#fff':c};display:flex;align-items:center;justify-content:center">${isQ?`<div class="q" style="width:110px;height:110px;font-size:70px;border:6px solid #3797f0;transform:scale(${t>0.7?1+0.15*Math.sin(cl((t-0.7)/0.4)*Math.PI):1})">?</div>`:`<div style="width:60%;height:10px;background:rgba(255,255,255,.35);border-radius:5px"></div>`}</div>`;}
+  const sc=-600+600*ease(t/0.7);
+  return bg()+`<div class="phone"><div class="notch"></div><div class="sbar"><span>7:02</span><span>▮▮ ◔</span></div>
+  <div style="padding:10px 20px;font-weight:800;font-size:24px">Fotos <span style="float:right;font-size:15px;color:#888;font-weight:600">2.417 itens</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;transform:translateY(${sc}px)">${cells}${cells}</div></div>`;
+},
+formatura(t){
+  let conf=''; for(let i=0;i<40;i++){const x=(i*97)%720, y=((i*173)%1280 + t*120*(1+(i%3)))%1280; conf+=`<div style="position:absolute;left:${x}px;top:${y}px;width:14px;height:8px;background:${['#ffd23f','#ed2b4a','#fff','#3797f0'][i%4]};transform:rotate(${i*40+t*200}deg)"></div>`;}
+  let bal=''; [[60,300,'#ffd23f'],[150,240,'#ed2b4a'],[600,280,'#fff'],[540,220,'#ffd23f'],[640,380,'#ed2b4a'],[30,420,'#fff']].forEach(([x,y,c],i)=>{bal+=`<div style="position:absolute;left:${x}px;top:${y+10*Math.sin(t*2+i)}px;width:80px;height:100px;border-radius:50%;background:${c};border:5px solid #2b211d"></div>`});
+  const p=pop(t/0.5), z=1+0.04*t;
+  return `<div style="position:absolute;inset:0;background:#2f4a7a;transform:scale(${z})">
+  <div style="position:absolute;left:0;right:0;top:0;height:120px;background:repeating-linear-gradient(90deg,#c9a227 0 40px,#e3bd3d 40px 80px);clip-path:polygon(0 0,100% 0,100% 60%,95% 100%,90% 60%,85% 100%,80% 60%,75% 100%,70% 60%,65% 100%,60% 60%,55% 100%,50% 60%,45% 100%,40% 60%,35% 100%,30% 60%,25% 100%,20% 60%,15% 100%,10% 60%,5% 100%,0 60%)"></div>
+  <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.15) 0 30px,transparent 30px 70px)"></div>
+  ${bal}${conf}
+  <div style="position:absolute;left:150px;top:150px;width:420px;padding:14px;background:#f6ecd0;border:6px solid #2b211d;border-radius:12px;text-align:center;font-weight:900;font-size:40px;color:#2b211d;transform:scale(${p})">FORMATURA 2018</div>
+  <div style="position:absolute;left:130px;top:720px;width:460px;height:640px;background:#22356b;border-radius:200px 200px 0 0;border:7px solid #2b211d"><div style="position:absolute;left:190px;top:0;width:80px;height:330px;background:#fff;clip-path:polygon(0 0,100% 0,50% 100%)"></div><div style="position:absolute;left:212px;top:30px;width:36px;height:260px;background:#d23a2e;clip-path:polygon(20% 0,80% 0,100% 85%,50% 100%,0 85%)"></div></div>
+  <div class="q" style="position:absolute;left:160px;top:330px;width:400px;height:400px;font-size:280px;border:14px solid #2b211d;transform:scale(${p})">?</div></div>`;
+},
+send(t){const E=window.E||{m1:1.9};return scenes.chat(t,[
+  {x:'seu perfil não tem nenhuma foto sua',at:0},
+  {x:'me manda uma? 👀',at:0},
+  {x:`<div class="q" style="width:170px;height:170px;font-size:110px;border-color:#3797f0">?</div>`,o:1,at:E.m1}],'7:03',
+  t>E.m1-0.3&&t<E.m1+0.3?finger(520,1400-(1400-1080)*ease((t-E.m1+0.3)/0.3)):'');},
+ship(t){
+  const sx = -420 + 470*ease(t/2.2);
+  let waves=''; for(let r=0;r<6;r++){waves+=`<path d="M${-80+((t*60*(r%2?1:-1))%80)} ${40+r*90} ${Array.from({length:12},(_,k)=>`q20 -18 40 0 t40 0`).join(' ')}" stroke="rgba(255,255,255,.45)" stroke-width="6" fill="none"/>`;}
+  const bub=(at,html,o)=>t<at?'':`<div style="position:absolute;${o?'right:40px':'left:40px'};top:${o?330:170}px;max-width:560px;padding:20px 26px;background:${o?'#3797f0':'#fff'};color:${o?'#fff':'#111'};border-radius:26px;border:5px solid #2b211d;font-size:30px;font-weight:700;transform:scale(${pop((t-at)/0.3)});transform-origin:${o?'right':'left'} top">${html}</div>`;
+  return `<div style="position:absolute;inset:0;background:#9fd6ee"></div>
+  <div style="position:absolute;left:80px;top:110px;width:150px;height:46px;background:#fff;border:5px solid #2b211d;border-radius:30px"></div><div style="position:absolute;left:470px;top:200px;width:190px;height:52px;background:#fff;border:5px solid #2b211d;border-radius:30px"></div>
+  <div style="position:absolute;left:${sx}px;top:560px;width:560px;height:300px">
+   <div style="position:absolute;left:300px;top:0;width:44px;height:90px;background:#d23a2e;border:6px solid #2b211d"></div>
+   <div style="position:absolute;left:110px;top:80px;width:360px;height:90px;background:#fff;border:6px solid #2b211d;border-radius:10px;display:flex;gap:14px;align-items:center;padding-left:24px">${'<i style="width:22px;height:22px;border-radius:50%;background:#2f4a7a;display:block"></i>'.repeat(10)}</div>
+   <div style="position:absolute;left:0;top:165px;width:560px;height:120px;background:#24407a;border:6px solid #2b211d;clip-path:polygon(0 0,100% 0,92% 100%,6% 100%);color:#fff;font-weight:900;font-size:24px;text-align:right;padding:40px 70px 0 0">MAR ALTO</div>
+  </div>
+  <div style="position:absolute;left:0;right:0;top:820px;bottom:0;background:#2a8fb8;border-top:7px solid #2b211d;transform:translateY(${6*Math.sin(t*3)}px)"><svg width="800" height="520" style="position:absolute;left:0;top:0">${waves}</svg></div>
+  ${bub((window.E||{b1:2.75}).b1,'⚓ desembarco em Santos dia 30.<br><span style="color:#e1306c">sai comigo?</span>')}${bub((window.E||{b2:3.85}).b2,'SIM!!! 😁',1)}`;
+},
+// 15) a ficha cai: sorriso some, suor
+suor(t){
+  const E=window.E||{real:2.0};
+  const k=t>E.real;
+  const head=`<g transform="translate(360 640)">${claudioHead(k?{eyes:'open',mouth:'grimace',lookX:-.8,sweat:t,brow:1.2}:{eyes:'squint',mouth:'grin',flush:1})}</g>`;
+  const z=2.4+0.3*ease(t/5);
+  const gulp=t>E.real+1.2&&t<E.real+1.6?`<path d="M330 790 q30 12 60 0" stroke="${OL}" stroke-width="6" fill="none"/>`:'';
+  return svg(rays(k?'#5b6fa6':'#f2c59a',k?'#52659a':'#ecb985',t)+cam(head+gulp,z,360,660));
+},
+final(t){
+  const face=(x,flip,pre)=>`<div style="position:absolute;left:${x}px;top:560px;width:270px;height:270px;border-radius:50%;overflow:hidden;border:7px solid #2b211d;background:#fff;transform:scale(${pop((t-0.2)/0.4)}) ${flip?'scaleX(-1)':''}">${`<svg width="270" height="270" viewBox="-150 -170 300 300">${claudioHead({eyes:'open',mouth:'grin',lookX:flip?-.5:.5})}</svg>`}</div>`;
+  return `<div style="position:absolute;inset:0;background:#e8a91f"></div><div style="position:absolute;inset:0;background:#d2393a;clip-path:polygon(56% 0,100% 0,100% 100%,44% 100%)"></div>
+  <div style="position:absolute;left:44%;top:0;width:12%;height:100%;background:linear-gradient(105deg,transparent 45%,#2b211d 45%,#2b211d 55%,transparent 55%)"></div>
+  <div style="position:absolute;left:40px;top:90px;display:flex;gap:16px;transform:translateY(${-200+200*ease(t/0.4)}px)">
+   <div class="badge" style="width:190px;padding:10px"><div style="font-size:16px">FALTAM</div><div style="font-size:42px;color:#ffd23f;line-height:1.1">30 DIAS</div></div>
+   <div class="badge" style="width:440px;padding:14px 18px;text-align:left"><div style="font-size:16px">PARECIDO COM A FOTO</div><div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div style="flex:1;height:18px;background:#4a3d38;border-radius:9px"><div style="width:3%;height:100%;background:#ed2b4a;border-radius:9px"></div></div><span style="color:#ed2b4a;font-size:34px">3%</span></div></div></div>
+  <div style="position:absolute;left:150px;top:290px;width:420px;padding:10px;background:#2b211d;border:4px solid #fff;border-radius:14px;color:#fff;text-align:center;font-weight:800;font-size:30px;transform:scale(${pop((t-0.4)/0.4)})">COMENTE UMA PALAVRA</div>
+  <div style="position:absolute;left:30px;top:400px;width:300px;text-align:center;color:#fff;font-weight:900;font-size:64px;-webkit-text-stroke:3px #2b211d;text-shadow:0 5px 0 #2b211d">BARBA<div style="font-size:20px;font-weight:700;-webkit-text-stroke:0;text-shadow:none">custa 1 dia</div></div>
+  <div style="position:absolute;right:30px;top:400px;width:300px;text-align:center;color:#fff;font-weight:900;font-size:64px;-webkit-text-stroke:3px #2b211d;text-shadow:0 5px 0 #2b211d">DENTE<div style="font-size:20px;font-weight:700;-webkit-text-stroke:0;text-shadow:none">custa 3 dias</div></div>
+  ${face(45,0)}${face(405,1)}
+  <div style="position:absolute;left:310px;top:650px;width:100px;height:100px;border-radius:50%;background:#2b211d;border:5px solid #fff;color:#ffd23f;font-weight:900;font-size:38px;display:flex;align-items:center;justify-content:center;transform:scale(${pop((t-0.6)/0.3)})">OU</div>
+  `;
+}
+};
+window.render=(name,t)=>{Sg.innerHTML=scenes[name](t);};
+</script></body></html>
