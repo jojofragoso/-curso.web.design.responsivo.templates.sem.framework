@@ -39,7 +39,7 @@ SEQ = [
     ('abertura', 0, 0.0),
     ('orcamento', at('primeiro'), -0.15),
     ('carteira', at('primeiro', 'claudio'), -0.15),
-    ('conserto', at('passa'), -0.4),
+    ('conserto', at('vira'), -0.4),
     ('posto', at('tentativa'), -0.6),
     ('primo', at('segunda'), -0.15),
     ('cola', at('terceira'), -0.15),
@@ -49,7 +49,7 @@ SEQ = [
     ('espelho', at('sorriso', 'voltou'), -0.6),
     ('audio', at('audio'), -0.6),
     ('mapa', at('navio', 'cada'), -1.2),
-    ('final2', at('vinte', 'sete'), -0.15),
+    ('final2', at('agora'), -0.15),
 ]
 starts = [0.0 if k == 0 else st(i, off) for k, (_, i, off) in enumerate(SEQ)]
 durs = [(starts[k + 1] if k + 1 < len(SEQ) else TOTAL) - starts[k] for k in range(len(SEQ))]
@@ -58,7 +58,7 @@ rel = lambda name, i, off=0.0: round(st(i, off) - starts[idx[name]], 3)
 
 EVENTS = {
     'abertura': {'feio': rel('abertura', at('sinceramente'))},
-    'orcamento': {'val': rel('orcamento', at('oitocentos'))},
+    'orcamento': {'val': rel('orcamento', at('800'))},
     'carteira': {'pizza': rel('carteira', at('vale'))},
     'conserto': {'mais': rel('conserto', at('junta')), 'faltam': rel('conserto', at('ainda', 'faltam'))},
     'posto': {'close': rel('posto', at('senha'), -0.2)},
@@ -68,7 +68,7 @@ EVENTS = {
     'cadeira': {'mao': rel('cadeira', at('professora'))},
     'dias': {'anest': rel('dias', at('anestesias')), 'rest': rel('dias', at('restauracao')), 'limp': rel('dias', at('limpeza'))},
     'espelho': {'desde': rel('espelho', at('desde'))},
-    'audio': {'dorm': rel('audio', at('boca'), -0.3), 'beb': rel('audio', at('bebado'), -0.4),
+    'audio': {'dorm': rel('audio', at('audio', 'boca'), -0.3), 'beb': rel('audio', at('bebado'), -0.4),
               'video': rel('audio', at('amanha'))},
 }
 
@@ -170,7 +170,7 @@ sfx.build(ev, TOTAL, 'sfx_p2.wav')
 
 # 4) junta vídeo, legendas, narração e efeitos
 fc = (f"[0:v]ass=legendas_p2.ass:fontsdir=cenas[vout];"
-      f"[1:a]volume=1.4,apad,atrim=0:{TOTAL}[nar];[2:a]volume=0.32[fx];"
+      f"[1:a]volume=1.4,apad,atrim=0:{TOTAL}[nar];[2:a]volume=0.22[fx];"
       f"[nar][fx]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-15:TP=-1.5:LRA=11,aresample=48000,"
       f"afade=t=out:st={TOTAL - 0.5}:d=0.5[aout]")
 subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', 'tmp_video.mp4', '-i', 'narracao_p2.mp3', '-i', 'sfx_p2.wav',

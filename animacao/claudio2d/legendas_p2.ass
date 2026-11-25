@@ -1,0 +1,84 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 720
+PlayResY: 1280
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Leg,Poppins ExtraBold,60,&H00FFFFFF,&H00FFFFFF,&H001D212B,&H781D212B,0,0,0,0,100,100,0,0,1,5,4,2,30,30,210,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Vocês escolheram {\c&H2CC8F5&}dente.{\c&HFFFFFF&}
+Dialogue: 0,0:00:02.40,0:00:04.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E sinceramente estava
+Dialogue: 0,0:00:04.40,0:00:05.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}feio{\c&HFFFFFF&} mesmo.
+Dialogue: 0,0:00:05.60,0:00:07.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Primeiro problema.
+Dialogue: 0,0:00:07.20,0:00:08.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}O dentista cobra
+Dialogue: 0,0:00:08.00,0:00:09.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}R$ {\c&H2CC8F5&}800.{\c&HFFFFFF&}
+Dialogue: 0,0:00:09.60,0:00:10.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}O Cláudio tem
+Dialogue: 0,0:00:10.40,0:00:12.13,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}112{\c&HFFFFFF&} e um
+Dialogue: 0,0:00:12.13,0:00:13.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}vale {\c&H2CC8F5&}pizza.{\c&HFFFFFF&}
+Dialogue: 0,0:00:13.20,0:00:14.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ele vira duas
+Dialogue: 0,0:00:14.00,0:00:15.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}noites consertando celular,
+Dialogue: 0,0:00:15.60,0:00:17.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}junta mais {\c&H2CC8F5&}80.{\c&HFFFFFF&}
+Dialogue: 0,0:00:17.20,0:00:19.47,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ainda faltam {\c&H2CC8F5&}608.{\c&HFFFFFF&}
+Dialogue: 0,0:00:19.60,0:00:21.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Primeira tentativa:
+Dialogue: 0,0:00:21.20,0:00:21.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}o posto de
+Dialogue: 0,0:00:21.60,0:00:22.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}saúde.
+Dialogue: 0,0:00:22.40,0:00:23.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A senha dele
+Dialogue: 0,0:00:23.20,0:00:24.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}é {\c&H2CC8F5&}147.{\c&HFFFFFF&}
+Dialogue: 0,0:00:24.80,0:00:25.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Estão chamando a
+Dialogue: 0,0:00:25.60,0:00:26.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}9.{\c&HFFFFFF&}
+Dialogue: 0,0:00:26.00,0:00:27.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Segunda:
+Dialogue: 0,0:00:27.20,0:00:28.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}o primo da
+Dialogue: 0,0:00:28.00,0:00:28.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}dona {\c&H2CC8F5&}Neide{\c&HFFFFFF&} que
+Dialogue: 0,0:00:28.80,0:00:29.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}faz {\c&H2CC8F5&}dente.{\c&HFFFFFF&}
+Dialogue: 0,0:00:29.60,0:00:30.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ele faz {\c&H2CC8F5&}dente{\c&HFFFFFF&}
+Dialogue: 0,0:00:30.40,0:00:31.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}de {\c&H2CC8F5&}vampiro{\c&HFFFFFF&} pra
+Dialogue: 0,0:00:31.80,0:00:32.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}festa.
+Dialogue: 0,0:00:32.40,0:00:33.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Terceira:
+Dialogue: 0,0:00:33.20,0:00:34.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}ele cola um
+Dialogue: 0,0:00:34.00,0:00:34.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}dos dentes de
+Dialogue: 0,0:00:34.40,0:00:35.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}vampiro{\c&HFFFFFF&} com a
+Dialogue: 0,0:00:35.20,0:00:36.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}cola de tela
+Dialogue: 0,0:00:36.00,0:00:37.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}do trabalho.
+Dialogue: 0,0:00:37.20,0:00:38.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Durou dois {\c&H2CC8F5&}segundos.{\c&HFFFFFF&}
+Dialogue: 0,0:00:38.80,0:00:39.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A dona {\c&H2CC8F5&}Neide{\c&HFFFFFF&}
+Dialogue: 0,0:00:39.20,0:00:40.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}confiscou{\c&HFFFFFF&} a cola.
+Dialogue: 0,0:00:40.80,0:00:41.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Até que ele
+Dialogue: 0,0:00:41.20,0:00:42.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}descobre a clínica
+Dialogue: 0,0:00:42.20,0:00:43.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}da faculdade.
+Dialogue: 0,0:00:43.60,0:00:44.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Atende de {\c&H2CC8F5&}graça.{\c&HFFFFFF&}
+Dialogue: 0,0:00:44.80,0:00:45.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A dentista é
+Dialogue: 0,0:00:45.60,0:00:46.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}aluna do terceiro
+Dialogue: 0,0:00:46.40,0:00:47.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}período.
+Dialogue: 0,0:00:47.20,0:00:48.27,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A professora segura
+Dialogue: 0,0:00:48.27,0:00:49.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}a mão dela.
+Dialogue: 0,0:00:49.60,0:00:50.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Três dias,
+Dialogue: 0,0:00:50.40,0:00:51.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}duas anestesias,
+Dialogue: 0,0:00:51.60,0:00:52.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}uma restauração e
+Dialogue: 0,0:00:52.80,0:00:54.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}uma limpeza depois,
+Dialogue: 0,0:00:54.80,0:00:56.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}o sorriso {\c&H2CC8F5&}voltou.{\c&HFFFFFF&}
+Dialogue: 0,0:00:56.00,0:00:56.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ele sorri no
+Dialogue: 0,0:00:56.80,0:00:58.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}espelho pela primeira
+Dialogue: 0,0:00:58.40,0:01:00.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}vez desde {\c&H2CC8F5&}2021.{\c&HFFFFFF&}
+Dialogue: 0,0:01:00.80,0:01:01.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Sorri de boca
+Dialogue: 0,0:01:01.60,0:01:03.87,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}aberta.
+Dialogue: 0,0:01:04.00,0:01:04.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ele manda um
+Dialogue: 0,0:01:04.40,0:01:05.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}áudio pra {\c&H2CC8F5&}Bia.{\c&HFFFFFF&}
+Dialogue: 0,0:01:05.60,0:01:06.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}A boca ainda
+Dialogue: 0,0:01:06.40,0:01:07.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}tá dormente.
+Dialogue: 0,0:01:07.20,0:01:08.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Ela responde:
+Dialogue: 0,0:01:08.40,0:01:10.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}você tá {\c&H2CC8F5&}bêbado?{\c&HFFFFFF&}
+Dialogue: 0,0:01:10.40,0:01:11.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E depois:
+Dialogue: 0,0:01:11.20,0:01:11.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}amanhã a gente
+Dialogue: 0,0:01:11.60,0:01:12.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}faz chamada de
+Dialogue: 0,0:01:12.40,0:01:14.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}vídeo?{\c&HFFFFFF&}
+Dialogue: 0,0:01:14.00,0:01:14.40,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}E o navio
+Dialogue: 0,0:01:14.40,0:01:15.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}dela tá cada
+Dialogue: 0,0:01:15.60,0:01:16.80,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}vez mais perto.
+Dialogue: 0,0:01:16.80,0:01:17.60,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Agora,
+Dialogue: 0,0:01:17.60,0:01:19.20,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}é {\c&H2CC8F5&}barba{\c&HFFFFFF&} ou
+Dialogue: 0,0:01:19.20,0:01:20.00,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}{\c&H2CC8F5&}cabelo?{\c&HFFFFFF&}
+Dialogue: 0,0:01:20.00,0:01:21.97,Leg,,0,0,0,,{\fscx82\fscy82\t(0,110,\fscx100\fscy100)}Comenta uma {\c&H2CC8F5&}palavra.{\c&HFFFFFF&}
