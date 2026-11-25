@@ -1,0 +1,19 @@
+{
+  "cenas": [
+    {
+      "visual": "cenas/01.mp4",
+      "audio": "audio/01.mp3",
+      "texto": "Por que o Barão do Café era tão poderoso que até o imperador tinha medo dele?"
+    },
+    {
+      "visual": "cenas/02.mp4",
+      "audio": "audio/02.mp3",
+      "texto": "Pra começar, ele controlava metade das fazendas do vale."
+    },
+    {
+      "visual": "cenas/03.png",
+      "audio": "audio/03.mp3",
+      "texto": "E cada saca de café que saía do porto passava pelas mãos dele."
+    }
+  ]
+}
