@@ -1,138 +1,117 @@
 # Guia de Estilo: Animação estilo Palito
 
-Este guia foi tirado da análise quadro a quadro do vídeo de referência (1min38s, vertical 1080x1920, 24 fps). Use-o como regra fixa para todos os vídeos do TikTok e do YouTube. Assim cada história nova sai com a mesma cara.
+**Regra número 1: este estilo NÃO muda.** Todo vídeo novo (TikTok, Reels, Shorts ou YouTube) segue o vídeo de referência: o mesmo traço, o mesmo tipo de personagem, o mesmo ritmo e a mesma legenda. As imagens em `referencias/` são o padrão visual oficial. Antes de criar qualquer cena, compare com elas.
+
+Referência analisada: vídeo vertical 1080x1920, 24 fps, 1min38s, narração em PT-BR, 20 cenas.
 
 ---
 
-## 1. Como esse vídeo é feito (o que descobri)
+## 1. Como esse vídeo é feito
 
-O vídeo **não é animação desenhada à mão nem 3D**. É o fluxo usado pelos canais de "história explicada":
-
-1. **Roteiro curto e direto**, narrado sem parar.
-2. **Uma imagem por frase**, gerada por IA de imagem, sempre com o mesmo estilo de cartum.
-3. **Cada imagem vira um clipe de 3 a 10 s** em uma IA de imagem-para-vídeo. É por isso que o personagem se vira, mexe as mãos, o avião solta fumaça e a câmera se aproxima.
-4. **Narração com voz de IA** (só voz, **sem música de fundo**, sem pausas longas).
-5. **Legendas de 1 a 3 palavras** aparecendo junto com a fala, no centro-baixo da tela.
-
-Ritmo medido: cerca de **25 cenas em 98 s**, ou seja, **troca de cena a cada 3 a 5 s** (mínimo ~1 s, máximo ~9 s).
-
-> Observação: o arquivo `three.module.min.js` (Three.js) que você mandou é uma biblioteca 3D para navegador. Ela **não** consegue produzir esse visual de ilustração. Para este estilo, o caminho é IA de imagem + IA de vídeo + a ferramenta de montagem desta pasta.
+1. **Narração única** com voz de IA (ElevenLabs), rápida e contínua. **Sem música e sem efeitos sonoros.**
+2. **Uma ilustração por trecho de fala**, gerada por IA de imagem, sempre no mesmo estilo de cartum.
+3. Cada ilustração vira um **clipe animado** em IA de imagem-para-vídeo: o personagem se vira, gesticula, anda; a fumaça sobe; a câmera se aproxima devagar.
+4. **Legenda de 1 a 3 palavras** sincronizada palavra por palavra (agora em **Cal Sans**).
 
 ---
 
-## 2. Regras visuais (não mudar)
+## 2. Regras visuais (obrigatórias)
 
-### Personagens: o "palito"
-- **Cabeça grande e redonda, branca**, contorno preto grosso. É uma bola branca, sem pele colorida.
-- **Olhos**: dois pontos pretos pequenos. **Sobrancelhas** grossas e expressivas (é nelas que fica a emoção).
-- **Boca** pequena e simples. Nariz quase ausente (um traço curto, às vezes).
-- **Cabelo e bigode**: formas pretas sólidas, grandes, que identificam o personagem.
-- **Tronco**: só a roupa (camisa, paletó, farda) em forma de saco/retângulo arredondado, com cor chapada e estampa simples (ex.: listras).
-- **Braços**: **linhas pretas finas (palitos)** que saem da manga, com **mãos pretas** em forma de luva/mitene.
-- **Pernas**: **muito longas e finas**, na cor da calça, terminando em sapatos pretos pequenos.
-- Proporção: cabeça ≈ 1/4 da altura; pernas ≈ metade da altura.
-- Cada personagem tem **uma roupa fixa** que nunca muda durante o vídeo (identidade visual).
+### Personagem "palito"
+- **Cabeça grande, redonda e BRANCA** (sem cor de pele), com contorno preto grosso.
+- **Olhos**: dois pontinhos pretos. **Sobrancelhas** pretas grossas que mostram a emoção. **Boca** pequena. Nariz, se tiver, é um traço curto.
+- **Cabelo, bigode e barba**: formas pretas sólidas e grandes, que identificam quem é o personagem.
+- **Tronco**: só a roupa (camisa, paletó, farda), em forma arredondada, com cor chapada e estampa simples.
+- **Braços**: **palitos pretos finos** saindo da manga, com **mãos pretas** em forma de luva.
+- **Pernas**: **muito compridas e finas**, na cor da calça, com sapatinhos pretos.
+- Proporção: a cabeça ocupa ≈ 1/4 da altura e as pernas ≈ metade.
+- **Roupa fixa** por personagem durante o vídeo inteiro.
+- Mulheres seguem a mesma regra: cabeça branca, cabelo como forma sólida (castanho/preto), roupa chapada.
 
 ### Cenários
-- Ilustração **detalhada**, estilo quadrinho/graphic novel: contorno preto em tudo, cores **chapadas e meio dessaturadas** (terrosos, verdes-oliva, azuis suaves), sombreamento leve.
-- O contraste é proposital: **personagem simples × cenário rico**.
-- Iluminação conta a emoção: pôr do sol laranja (apresentação), noite azul (perigo), fumaça cinza (violência), luz amarela quente (luxo).
+- Ilustração **detalhada** estilo graphic novel, contorno preto em tudo, cores **chapadas e meio dessaturadas** (terra, tijolo, verde-oliva, azul suave), sombreamento leve.
+- **Personagem simples × cenário rico**: esse contraste é a marca do estilo.
+- A luz conta a emoção: pôr do sol laranja (abertura), noite azul (perigo), fumaça cinza (violência), luz amarela de madeira (luxo), céu azul limpo (fatos).
 
-### Enquadramentos que se repetem
-| Tipo | Uso no vídeo |
-|---|---|
-| Plano geral de costas, olhando a cidade/paisagem | Abertura e fechamento (o mesmo plano volta no fim) |
-| Plano médio em plongée (câmera de cima) | Personagem fazendo algo (contando dinheiro) |
-| Plano médio frontal, olhando para a câmera | Momento de "virar" para o público |
-| Close extremo no rosto | Clímax / tensão (ex.: no telefone) |
-| Cena sem personagem (objeto/paisagem) | Dados e fatos (avião, dinheiro com rato, rua destruída) |
-| Plano sobre o ombro de outro personagem | Diálogo / ameaça |
+### Os 20 tipos de cena da referência (ver `referencias/`)
+| # | Arquivo | Enquadramento | Para que serve |
+|---|---|---|---|
+| 1 | 01-costas-olhando-cidade | Plano geral, personagem de costas olhando a cidade | Abertura (gancho) |
+| 2 | 02-virando-para-camera | O personagem se vira para a câmera (zoom-in) | Final do gancho |
+| 3 | 03-contando-dinheiro-plongee | Câmera de cima, personagem fazendo algo | "Pra começar…" |
+| 4 | 04-objeto-sem-personagem | Close de objeto (dinheiro + rato) | Detalhe curioso |
+| 5 | 05-dialogo-dois-personagens | Dois personagens na rua, conversando | Contraste/contradição |
+| 6 | 06-personagem-secundario-noite | Capanga sério, rua à noite | Ameaça |
+| 7 | 07-sobre-o-ombro-escritorio | Sobre o ombro; vítima atrás da mesa | Regra/ameaça direta |
+| 8 | 08-cenario-destruido | Rua destruída com fumaça, sem personagem | Violência em escala |
+| 9-10 | 09/10-aviao | Objeto no céu azul (avião explodindo e caindo) | Evento histórico |
+| 11 | 11-destrocos | Destroços, céu cinza | "Ninguém sobreviveu" |
+| 12 | 12-andando-noite | De costas, subindo caminho à noite | "Agora vem…" (virada) |
+| 13 | 13-poltrona-interior | Sentado em poltrona, interior de madeira | Luxo |
+| 14 | 14-sinuca-interior | Jogando sinuca | Luxo/privilégio |
+| 15 | 15-soldados-beco | Soldados armados avançando no beco | Cerco |
+| 16 | 16-janela-preocupado | Olhando pela janela, preocupado | Tensão |
+| 17 | 17-close-telefone | Close extremo do rosto no telefone | Clímax |
+| 18 | 18-fuga-telhados | Correndo nos telhados (vista de cima) | Fuga |
+| 19 | 19-caido-telhado | Caído no telhado | Desfecho |
+| 20 | 20-costas-fechamento | A mesma cena de abertura | Fechamento circular |
 
-### Movimento (no gerador de vídeo)
-- Movimentos **simples e lentos**: virar o corpo, gesticular, andar, piscar, fumaça subindo, câmera aproximando devagar.
-- Câmera quase sempre **parada ou com zoom-in lento**. Nada de giro rápido.
+Após o fechamento, a última frase reaproveita a cena 3 ("um criminoso…").
 
----
-
-## 3. Prompts prontos (copiar e trocar o que está entre colchetes)
-
-Escreva os prompts **em inglês**: os geradores entendem melhor. Formato **9:16**.
-
-### 3.1 Bloco de estilo (cole no FINAL de todo prompt de imagem)
-```
-2D cartoon illustration, graphic novel style, thick clean black outlines, flat muted colors with soft shading, detailed background. Character design: simple stick-figure style person with a big round plain white head, two small black dot eyes, thick expressive eyebrows, tiny mouth, solid black hair shapes, body is only the clothing shape, thin black stick arms with black mitten hands, very long thin legs, small black shoes. Vertical 9:16, no text, no letters, no watermark.
-```
-
-### 3.2 Ficha do personagem (crie UMA vez por personagem e reutilize igual)
-```
-Character sheet, front view, side view and back view of the same character: [Pablo-like man with black curly hair and thick black mustache, light blue polo shirt with thin white horizontal stripes, brown belt, beige trousers]. Plain light gray background. + BLOCO DE ESTILO
-```
-Guarde a melhor imagem e use-a como **imagem de referência de personagem** (Midjourney `--cref`, "character reference" no Flux/Leonardo, ou anexada no ChatGPT/Gemini). É isso que mantém o personagem igual em todas as cenas.
-
-### 3.3 Prompt de cena
-```
-[ENQUADRAMENTO: wide shot from behind / medium shot from above / close-up of the face] of [PERSONAGEM descrito igual à ficha] [AÇÃO: standing on a balcony looking at the city / counting stacks of money on a wooden table], [CENÁRIO: hillside favela of a South American city at sunset, mountains behind], [CLIMA/LUZ: warm orange sunset light]. + BLOCO DE ESTILO
-```
-
-### 3.4 Prompt de movimento (imagem → vídeo)
-```
-The character slowly [turns around to face the camera / picks up a stack of money and looks at it / walks forward up the path], subtle natural movement, eyebrows move to show [worry / anger], slow gentle camera push-in, keep the cartoon art style exactly the same, no morphing, no new characters.
-```
-Duração: 5 s (ou 10 s para cenas longas). Uma ação por clipe.
-
-**Ferramentas que funcionam para isso** (escolha uma e não troque no meio do canal):
-- Imagem: Midjourney, ChatGPT (imagem), Gemini (Nano Banana), Flux, Leonardo.
-- Vídeo: Kling, Hailuo (MiniMax), Veo, Runway, Pika.
-- Voz: ElevenLabs (ou outra TTS com voz masculina grave em PT-BR).
+### Ritmo e movimento
+- A cena troca a cada **2 a 6 s** (média ~4,5 s; momentos de ação têm cortes de ~1 s; fatos longos até ~9 s).
+- **O corte acompanha a fala, não a frase.** A imagem mostra **literalmente** o que está sendo dito naquele momento ("apodrecendo" → rato no dinheiro; "avião" → avião).
+- Movimento **simples e lento**: virar, gesticular, andar, piscar, fumaça; câmera **parada ou com zoom-in lento**. Nunca giros rápidos nem transições com efeito: **corte seco** sempre.
 
 ---
 
-## 4. Roteiro: a fórmula do vídeo de referência
+## 3. Prompts (em inglês; formato 9:16)
 
-1. **Gancho (0-5 s)**, sempre uma pergunta forte: *"Por que [X] era tão [perigoso/rico/temido] que até [autoridade] tinha medo de [ação]?"*
-2. **"Pra começar…"**: o fato mais impressionante, com número (*"movimentava bilhões de dólares"*).
-3. **Escalada**: 3 a 5 fatos, cada um mais chocante. Use números exatos ("com 107 pessoas a bordo").
-4. **Virada**: *"Agora vem uma parte inacreditável…"*.
-5. **Queda/desfecho**: *"Até que em [ano]…"*.
-6. **Fechamento circular**: volta a mostrar o plano de abertura e encerra com uma frase de efeito sobre o personagem.
+### 3.1 Bloco de estilo (vai no final de TODO prompt de imagem)
+```
+2D cartoon illustration in graphic novel style, thick clean black outlines, flat muted desaturated colors with soft shading, richly detailed background. Character design: simple cartoon person with a big round plain WHITE head (no skin color), two small black dot eyes, thick black expressive eyebrows, small simple mouth, hair and mustache as solid black shapes, the body is only the clothing shape, thin black stick arms with black mitten hands, very long thin legs in trouser color, small black shoes. Vertical 9:16 composition, no text, no letters, no captions, no watermark.
+```
+Sempre anexe 2 ou 3 imagens de `referencias/` como **referência de estilo**. Para o personagem principal, anexe também a ficha dele.
 
-Regras de texto:
-- Frases curtas, linguagem falada (*"pra"*, *"tava"*), sem palavras difíceis.
-- Cerca de **2,5 a 3 palavras por segundo**: ~250 palavras para 1min30.
-- **Uma frase = uma cena** (é assim que você monta o `roteiro.json`).
+### 3.2 Ficha do personagem (uma vez por personagem)
+```
+Character turnaround sheet of the same character, front view, side view and back view, full body, plain light gray background: [DESCRIÇÃO: man with black curly hair and thick black mustache, light blue polo shirt with thin white horizontal stripes, brown belt, beige trousers]. + BLOCO DE ESTILO
+```
 
----
+### 3.3 Cena
+```
+[ENQUADRAMENTO da tabela acima] of [PERSONAGEM exatamente como na ficha] [AÇÃO], [CENÁRIO detalhado], [LUZ/CLIMA]. + BLOCO DE ESTILO
+```
 
-## 5. Áudio e legendas
-
-- **Voz**: narrador masculino, tom de documentário, rápido e envolvente. Sem música (ou música bem baixa, se quiser se diferenciar).
-- **Legendas** (a ferramenta já faz isto):
-  - Fonte **Merriweather Bold** (serifada), branca, contorno escuro fino e sombra suave.
-  - Tamanho ~68 px em 1080 de largura, centralizada, a ~74% da altura da tela.
-  - **1 a 3 palavras por vez**, sem vírgula/ponto (só `?` e `!`).
-
----
-
-## 6. Passo a passo para cada vídeo novo
-
-1. Escreva o roteiro com a fórmula da seção 4 e divida-o em frases (uma por cena).
-2. Para cada frase, gere a **imagem** (seção 3.3) usando a ficha do personagem como referência.
-3. Anime cada imagem (seção 3.4) e salve como `cenas/01.mp4`, `cenas/02.mp4`…
-   (Se uma cena não precisar de movimento, deixe só a imagem `.png`: a ferramenta aplica um zoom lento.)
-4. Gere a narração **de cada frase separada** (`audio/01.mp3`, `audio/02.mp3`…). Assim cada cena fica do tamanho exato da fala.
-5. Copie `ferramenta/roteiro_exemplo.json`, preencha e rode:
-   ```
-   python3 ferramenta/montar_video.py roteiro.json video_final.mp4
-   ```
-   Requisitos: `ffmpeg` instalado e `pip install pillow`.
-6. Resultado: MP4 vertical 1080x1920 pronto para TikTok, Reels e Shorts.
-
-Para o **YouTube horizontal** (vídeos longos), use o mesmo estilo e gere as imagens em 16:9. A ferramenta atual é para vertical. Se for preciso, dá para adaptá-la a 1920x1080.
+### 3.4 Movimento (imagem → vídeo, 5 s)
+```
+The character slowly [AÇÃO SIMPLES], subtle natural cartoon movement, eyebrows show [EMOÇÃO], static camera with a slow gentle push-in, keep the exact same 2D cartoon art style and outlines, no morphing, no extra characters, no text.
+```
 
 ---
 
-## 7. Cuidados
+## 4. Fórmula do roteiro (para quando o roteiro for meu)
 
-- Pessoas reais retratadas em cartum (história, true crime) são o padrão desse nicho. Confira os fatos e evite afirmar coisas não comprovadas.
-- Crie **seus próprios personagens fixos** (ex.: um narrador-mascote recorrente) para o canal ter identidade própria e não parecer cópia de outro canal.
-- Não reutilize trechos do vídeo de referência nos seus vídeos. Use-o só como padrão de estilo.
+1. **Gancho**: *"Por que [X] era tão [perigoso/rico/temido] que até [autoridade] tinha medo de [ação]?"*
+2. **"Pra começar…"**: o fato mais impressionante, com número.
+3. **"E olha a contradição…"** / escalada com 3 a 5 fatos, cada vez mais fortes, com números exatos.
+4. **"Agora vem uma das partes mais absurdas…"** (virada).
+5. **"Só que…" / "Até que em [ano]…"** (queda).
+6. **"Agora me diz…"**: pergunta final para gerar comentários, voltando à cena de abertura.
+
+Frases curtas e faladas ("pra", "tava"); ~2,7 palavras por segundo (≈ 260 palavras para 1min35).
+
+---
+
+## 5. Legenda (padrão fixo)
+- Fonte **Cal Sans**, branca, contorno escuro fino e sombra leve.
+- Tamanho 88 (em 1080 de largura), centralizada, a ~74% da altura da tela.
+- **1 a 3 palavras por vez**, trocando junto com a fala. Sem vírgula e sem ponto final (só `?` e `!`).
+- Somem em pausas longas.
+
+A ferramenta `ferramenta/montar_video.py` aplica tudo isso automaticamente.
+
+---
+
+## 6. Fluxo de produção
+Veja `COMO_USAR.md`.
