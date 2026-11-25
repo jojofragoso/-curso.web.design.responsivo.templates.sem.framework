@@ -230,9 +230,15 @@ export class Palito {
       this.boca.position.y = -0.2;
     }
     if (o.barba) {
-      const b = mesh(G.sph(0.4, 24, 16, 0, Math.PI * 2), o.barba === true ? COR.preto : o.barba, 0);
-      b.scale.set(1.02, 0.6, 0.9); put(head, b, 0, -0.17, 0.04);
-      this.boca.position.set(0, -0.15, 0.43);
+      // barba colada no rosto: faixa da esfera cobrindo queixo e bochechas
+      const cb = o.barba === true ? COR.preto : o.barba;
+      const b = mesh(new THREE.SphereGeometry(0.432, 36, 14, Math.PI / 2 - 1.45, 2.9, 1.95, 0.95), cb, 0.015, { side: THREE.DoubleSide });
+      put(head, b, 0, 0, 0);
+      if (!o.bigode) for (const s of [-1, 1]) {
+        const m = new THREE.Mesh(G.sph(0.08, 12, 8), toon(cb)); m.scale.set(1.1, 0.42, 0.4); m.rotation.z = -s * 0.3;
+        put(head, m, s * 0.07, -0.085, 0.405);
+      }
+      this.boca.position.set(0, -0.15, 0.42);
     }
     if (o.oculos) {
       for (const s of [-1, 1]) put(head, new THREE.Mesh(G.tor(0.075, 0.012), basic(COR.preto)), s * 0.13, 0.05, 0.405);
@@ -250,22 +256,34 @@ export class Palito {
     const cor = o.corCabelo ?? COR.preto, h = this.head;
     const tipo = o.cabelo ?? 'curto';
     if (tipo === 'careca') return;
-    const capa = (r = 0.445, tl = 1.25) => {
-      const m = mesh(new THREE.SphereGeometry(r, 32, 16, 0, Math.PI * 2, 0, tl), cor, 0.02);
-      m.rotation.x = -0.35; return put(h, m, 0, 0.02, -0.03);
+    // calota justa na cabeça (raio quase igual ao da cabeça), cobrindo topo e nuca, com a linha do cabelo acima da testa
+    const calota = (tl, inclin, r = 0.428) => {
+      const m = mesh(new THREE.SphereGeometry(r, 36, 18, 0, Math.PI * 2, 0, tl), cor, 0.018, { side: THREE.DoubleSide });
+      m.rotation.x = -inclin; return put(h, m, 0, 0, 0);
     };
-    if (tipo === 'cacheado') {
-      const R = rnd(5);
-      for (let i = 0; i < 46; i++) {
-        const th = R() * Math.PI * 2, ph = R() * 1.15;
-        const x = Math.sin(ph) * Math.cos(th), y = Math.cos(ph), z = Math.sin(ph) * Math.sin(th);
-        if (z > 0.55 && y < 0.75) continue;
-        put(h, mesh(G.sph(0.13 + R() * 0.05, 12, 10), cor, 0.015), x * 0.4, y * 0.4 + 0.02, z * 0.4 - 0.05);
+    const naSuperficie = (dir, r, raio, c = cor) => {
+      const v = new THREE.Vector3(...dir).normalize();
+      return put(h, mesh(G.sph(raio, 12, 10), c, 0.012), v.x * r, v.y * r, v.z * r);
+    };
+    if (tipo === 'curto') calota(1.3, 0.42);
+    else if (tipo === 'liso') {
+      calota(1.38, 0.4);
+      const fr = mesh(new THREE.SphereGeometry(0.433, 28, 10, Math.PI * 0.15, Math.PI * 0.7, 0.25, 0.65), cor, 0.012, { side: THREE.DoubleSide });
+      put(h, fr, 0, 0, 0); // franja
+    } else if (tipo === 'cacheado') {
+      calota(1.15, 0.5, 0.425);
+      const R = rnd(5), eixo = new THREE.Vector3(0, Math.cos(0.5), -Math.sin(0.5));
+      for (let i = 0; i < 70; i++) {
+        const v = new THREE.Vector3(R() * 2 - 1, R() * 2 - 1, R() * 2 - 1).normalize();
+        if (v.angleTo(eixo) > 1.1) continue;
+        naSuperficie([v.x, v.y, v.z], 0.43, 0.085 + R() * 0.035);
       }
-    } else capa(tipo === 'liso' ? 0.45 : 0.445, tipo === 'liso' ? 1.35 : 1.2);
-    if (tipo === 'coque') put(h, mesh(G.sph(0.17), cor, 0.02), 0, 0.3, -0.33);
-    if (tipo === 'longo') {
-      const m = mesh(G.cap(0.38, 0.5), cor, 0.02); m.scale.set(1.05, 1, 0.6); put(h, m, 0, -0.35, -0.2);
+    } else if (tipo === 'coque') {
+      calota(1.3, 0.42);
+      naSuperficie([0, 0.55, -0.83], 0.5, 0.15);
+    } else if (tipo === 'longo') {
+      calota(1.4, 0.4);
+      const m = mesh(G.cap(0.33, 0.45), cor, 0.018); m.scale.set(1.15, 1, 0.45); put(h, m, 0, -0.32, -0.27);
     }
   }
 
@@ -384,13 +402,41 @@ export function cacto(cor = 0x7fa05a, papelao = false) {
   if (papelao) put(g, mesh(G.box(0.08, 0.9, 0.5), 0x8a6a40, 0.015), 0, 0.45, -0.25).rotation.x = 0.5;
   return g;
 }
-export function casaBarro(w = 3, h = 2.2, d = 2.5, cor = COR.barro) {
+export function casaBarro(w = 6, h = 4.6, d = 5, cor = COR.barro) {
   const g = new THREE.Group();
   put(g, mesh(G.box(w, h, d), cor, 0.03), 0, h / 2, 0);
-  const telh = mesh(new THREE.CylinderGeometry(0.01, (w + 0.5) / Math.SQRT2, 0.9, 4, 1), COR.tijolo, 0.03);
-  telh.rotation.y = Math.PI / 4; telh.scale.set(1, 1, (d + 0.4) / (w + 0.5)); put(g, telh, 0, h + 0.45, 0);
-  put(g, mesh(G.box(0.7, 1.3, 0.06), COR.madeiraEsc, 0.02), -0.5, 0.65, d / 2 + 0.01);
-  put(g, mesh(G.box(0.6, 0.5, 0.06), 0x3b2a1e, 0.02), 0.75, 1.3, d / 2 + 0.01);
+  const telh = mesh(new THREE.CylinderGeometry(0.01, (w + 0.8) / Math.SQRT2, 1.6, 4, 1), COR.tijolo, 0.03);
+  telh.rotation.y = Math.PI / 4; telh.scale.set(1, 1, (d + 0.8) / (w + 0.8)); put(g, telh, 0, h + 0.8, 0);
+  put(g, mesh(G.box(1.6, 3.7, 0.08), COR.madeiraEsc, 0.02), -w * 0.18, 1.85, d / 2 + 0.02);
+  put(g, mesh(G.box(1.3, 1.1, 0.08), 0x3b2a1e, 0.02), w * 0.24, 2.6, d / 2 + 0.02);
+  return g;
+}
+/** cadeira simples (assento na altura certa para o pose sit) — frente em +z */
+export function cadeira(cor = COR.madeira) {
+  const g = new THREE.Group();
+  put(g, mesh(G.box(0.75, 0.1, 0.7), cor, 0.015), 0, 0.57, 0);
+  for (const [x, z] of [[-0.32, -0.3], [0.32, -0.3], [-0.32, 0.3], [0.32, 0.3]]) put(g, mesh(G.box(0.07, 0.57, 0.07), cor, 0.01), x, 0.285, z);
+  put(g, mesh(G.box(0.75, 0.9, 0.08), cor, 0.015), 0, 1.05, -0.33);
+  return g;
+}
+/** sofá com lugares; frente em +z. Devolve {g, lugares:[x...]} — sente o personagem com put(g, p.root, x, 0.08, 0.05) */
+export function sofa(cor = 0x8d5a4a, lugares = 3) {
+  const g = new THREE.Group(); const w = lugares * 1.05 + 0.4;
+  put(g, mesh(G.box(w, 0.7, 1.1), cor, 0.02), 0, 0.35, 0);
+  put(g, mesh(G.box(w, 1.1, 0.3), cor, 0.02), 0, 1.25, -0.45);
+  for (const s of [-1, 1]) put(g, mesh(G.box(0.25, 0.95, 1.1), cor, 0.02), s * (w / 2 - 0.12), 0.475, 0);
+  return { g, lugares: Array.from({ length: lugares }, (_, i) => (i - (lugares - 1) / 2) * 1.05) };
+}
+/** bando de pássaros (V pretos batendo asas) */
+export function passaros(n = 6, seed = 1) {
+  const g = new THREE.Group(); const R = rnd(seed); const aves = [];
+  for (let i = 0; i < n; i++) {
+    const a = new THREE.Group();
+    for (const s of [-1, 1]) { const asa = new THREE.Mesh(G.box(0.5, 0.05, 0.12), basic(0x1d1d1d)); asa.position.x = s * 0.25; const piv = new THREE.Group(); piv.add(asa); a.add(piv); }
+    a.position.set(R() * 6 - 3, R() * 2, R() * 4 - 2); a.userData.f = R() * 6; g.add(a); aves.push(a);
+  }
+  g.userData.update = (t, vx = 2) => { g.position.x += 0; aves.forEach((a) => { const b = Math.sin(t * 10 + a.userData.f) * 0.6; a.children[0].rotation.z = b; a.children[1].rotation.z = -b; }); };
+  semContorno(g);
   return g;
 }
 export function arvore(cor = COR.verde, h = 2.2) {
@@ -408,14 +454,18 @@ export function coqueiro(h = 4, curva = 0.5) {
     const nx = x + curva * (i / n) * 0.35, ny = y + h / n;
     s.position.set((x + nx) / 2, (y + ny) / 2, 0); s.rotation.z = -Math.atan2(nx - x, h / n); g.add(s); x = nx; y = ny;
   }
+  const copa = put(g, new THREE.Group(), x, y, 0);
   for (let i = 0; i < 7; i++) {
     const f = mesh(G.cap(0.12, 1.4), 0x4f8a43, 0.02); f.scale.set(1, 1, 0.35);
-    const piv = put(g, new THREE.Group(), x, y, 0, (i / 7) * Math.PI * 2);
+    const piv = put(copa, new THREE.Group(), 0, 0, 0, (i / 7) * Math.PI * 2);
     f.position.set(0, 0, 0.75); f.rotation.x = Math.PI / 2 + 0.5; piv.add(f);
   }
+  g.userData.copa = copa;
+  g.userData.balanca = (t) => { copa.rotation.z = Math.sin(t * 1.3 + x) * 0.08; copa.rotation.x = Math.sin(t * 1.1) * 0.05; };
   put(g, mesh(G.sph(0.13, 10, 8), 0x6b4a2a, 0.01), x + 0.12, y - 0.1, 0.05);
   return g;
 }
+export function arvoreBalanca(g, t, k = 0.04) { g.rotation.z = Math.sin(t * 1.2 + g.position.x) * k; }
 export function nuvem(s = 1) {
   const g = new THREE.Group();
   for (const [x, y, r] of [[0, 0, 1], [1.1, -0.2, 0.75], [-1.1, -0.25, 0.7], [0.5, 0.45, 0.7], [-0.45, 0.35, 0.65]])
