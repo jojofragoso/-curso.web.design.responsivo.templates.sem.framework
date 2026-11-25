@@ -1,0 +1,357 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Poppins;font-weight:600;src:url(node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:700;src:url(node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:800;src:url(node_modules/@fontsource/poppins/files/poppins-latin-800-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:900;src:url(node_modules/@fontsource/poppins/files/poppins-latin-900-normal.woff2)}
+html,body{margin:0;background:#000}canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three';
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const out = document.getElementById('out'), o2 = out.getContext('2d');
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => cl((t - a) / (b - a));
+const eio = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const eo = (t) => 1 - Math.pow(1 - t, 3);
+const eback = (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+// ---------- toon materials + ink outline ----------
+const grad = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 1; const x = c.getContext('2d'); ['#6a6a6a', '#a8a8a8', '#e0e0e0', '#ffffff'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i, 0, 1, 1); }); const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.NearestFilter; return t; })();
+const mat = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...o });
+const INK = new THREE.MeshBasicMaterial({ color: 0x1b120c, side: THREE.BackSide });
+function ink(mesh, s = 1.04) { const m = new THREE.Mesh(mesh.geometry, INK); m.scale.setScalar(s); m.raycast = () => {}; mesh.add(m); return mesh; }
+function M(geo, c, o = {}) { const { ink: ik, inkS, ...mo } = o; const m = new THREE.Mesh(geo, c instanceof THREE.Material ? c : mat(c, mo)); m.castShadow = true; m.receiveShadow = true; if (ik !== false) ink(m, inkS || 1.04); return m; }
+const box = (w, h, d, c, o) => M(new THREE.BoxGeometry(w, h, d), c, o);
+const cyl = (r1, r2, h, c, o, seg = 20) => M(new THREE.CylinderGeometry(r1, r2, h, seg), c, o);
+const sph = (r, c, o) => M(new THREE.SphereGeometry(r, 24, 18), c, o);
+function texCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+const scene = new THREE.Scene();
+const hemi = new THREE.HemisphereLight(0xfff1d6, 0x6d5a3a, 1.3); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe7c0, 1.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); scene.add(sun, sun.target);
+const lampLight = new THREE.PointLight(0xffc477, 0, 14, 1.6); scene.add(lampLight);
+const phoneLight = new THREE.PointLight(0x7fb6ff, 0, 6, 1.5); scene.add(phoneLight);
+const candleLight = new THREE.PointLight(0xffa548, 0, 10, 1.6); scene.add(candleLight);
+const sirenLight = new THREE.PointLight(0xff3030, 0, 16, 1.2); scene.add(sirenLight);
+
+// ---------- faces ----------
+function drawFace(x, e, o) {
+  const S = 512; x.fillStyle = e === 'dead' ? '#cdd3d6' : o.skin; x.fillRect(0, 0, S, S);
+  const cx = 256, ey = 236, dx = 52, lk = o.look || 0;
+  if (e !== 'dead') { x.fillStyle = 'rgba(232,120,110,.28)'; x.beginPath(); x.arc(cx - 86, 300, 26, 0, 7); x.arc(cx + 86, 300, 26, 0, 7); x.fill(); }
+  x.strokeStyle = '#1b120c'; x.lineCap = 'round'; x.lineJoin = 'round';
+  const closed = e === 'sleep' || e === 'dead' || e === 'blink';
+  for (const s of [-1, 1]) {
+    const ex = cx + s * dx;
+    if (closed) { x.lineWidth = 9; x.beginPath(); x.arc(ex, ey - 6, 22, .25 * Math.PI, .75 * Math.PI); x.stroke(); if (o.lashes) { x.beginPath(); x.moveTo(ex + s * 22, ey + 8); x.lineTo(ex + s * 32, ey + 2); x.stroke(); } continue; }
+    const r = e === 'shock' ? 34 : 30;
+    x.fillStyle = '#fff'; x.beginPath(); x.ellipse(ex, ey, r * .82, r, 0, 0, 7); x.fill(); x.lineWidth = 7; x.stroke();
+    const pr = e === 'shock' ? 9 : 15; x.fillStyle = o.iris || '#6b3e1e'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr + 5, 0, 7); x.fill(); x.fillStyle = '#120a06'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr - 2, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(ex + lk * 9 - 5, ey - 3, 4, 0, 7); x.fill();
+    if (e === 'suspect' || e === 'tired') { x.fillStyle = o.skin; x.fillRect(ex - r, ey - r - 2, r * 2, r * (e === 'tired' ? .95 : .8)); x.lineWidth = 7; x.beginPath(); x.moveTo(ex - r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.lineTo(ex + r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.stroke(); }
+    if (o.lashes) { x.lineWidth = 6; x.beginPath(); x.moveTo(ex + s * r * .7, ey - r * .7); x.lineTo(ex + s * (r * .7 + 12), ey - r * .7 - 10); x.stroke(); }
+    if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.arc(ex, ey, r + 12, 0, 7); x.stroke(); x.strokeStyle = '#1b120c'; }
+  }
+  if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.moveTo(cx - 10, ey - 6); x.lineTo(cx + 10, ey - 6); x.stroke(); x.strokeStyle = '#1b120c'; }
+  // brows
+  x.lineWidth = 9; x.strokeStyle = o.brow || '#2a1a10';
+  const by = ey - (e === 'shock' ? 58 : 48);
+  for (const s of [-1, 1]) { const ex = cx + s * dx; let inner = 0, outer = 0;
+    if (e === 'sad' || e === 'worried' || e === 'cry' || e === 'plead') { inner = -12; outer = 6; }
+    if (e === 'angry') { inner = 10; outer = -6; }
+    if (e === 'suspect' && s > 0) { inner = -14; outer = -14; }
+    x.beginPath(); x.moveTo(ex - s * 4 - s * -24 * 0 + (s < 0 ? 20 : -20), by + inner); x.lineTo(ex + (s < 0 ? -22 : 22), by + outer); x.stroke(); }
+  // nose
+  x.lineWidth = 6; x.strokeStyle = 'rgba(90,40,20,.6)'; x.beginPath(); x.moveTo(cx - 4, 268); x.quadraticCurveTo(cx + 10, 290, cx - 6, 296); x.stroke();
+  if (o.mustache) { x.fillStyle = o.brow || '#2a1a10'; x.beginPath(); x.moveTo(cx - 52, 330); x.quadraticCurveTo(cx, 296, cx + 52, 330); x.quadraticCurveTo(cx, 318, cx - 52, 330); x.fill(); }
+  // mouth
+  x.strokeStyle = '#3a1a10'; x.lineWidth = 8; x.fillStyle = '#5a2418';
+  const my = 330;
+  if (e === 'smile' || e === 'happy') { x.beginPath(); x.moveTo(cx - 34, my - 6); x.quadraticCurveTo(cx, my + 26, cx + 34, my - 6); x.stroke(); }
+  else if (e === 'talk' || e === 'shock') { x.beginPath(); x.ellipse(cx, my + 4, e === 'shock' ? 16 : 18, e === 'shock' ? 22 : 12, 0, 0, 7); x.fill(); }
+  else if (e === 'sad' || e === 'cry') { x.beginPath(); x.moveTo(cx - 26, my + 10); x.quadraticCurveTo(cx, my - 8, cx + 26, my + 10); x.stroke(); }
+  else if (e === 'worried' || e === 'plead') { x.beginPath(); x.moveTo(cx - 28, my + 4); x.quadraticCurveTo(cx - 14, my - 6, cx, my + 4); x.quadraticCurveTo(cx + 14, my + 12, cx + 28, my + 2); x.stroke(); }
+  else if (e === 'sleep') { x.beginPath(); x.arc(cx, my, 8, 0, Math.PI); x.stroke(); }
+  else if (e === 'dead') { x.beginPath(); x.moveTo(cx - 18, my + 4); x.lineTo(cx + 18, my + 4); x.stroke(); }
+  else { x.beginPath(); x.moveTo(cx - 22, my + 2); x.lineTo(cx + 22, my + 2); x.stroke(); }
+  if (e === 'cry' || e === 'plead') { x.fillStyle = 'rgba(120,190,240,.85)'; for (const s of [-1, 1]) { x.beginPath(); x.ellipse(cx + s * dx + s * 6, ey + 58, 9, 22, 0, 0, 7); x.fill(); } }
+  if (e === 'sweat') {}
+}
+
+// ---------- characters ----------
+const CHARS = {};
+function makeChar(name, o) {
+  const G = new THREE.Group(); G.userData = { o, faces: {} };
+  const skinM = mat(o.skin);
+  // legs
+  const legs = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .2, .95, 0); const l = cyl(.15, .13, .9, o.pants, {}, 12); l.position.y = -.45; p.add(l); const sh = box(.3, .16, .42, 0x2a2420); sh.position.set(0, -.92, .06); p.add(sh); G.add(p); legs.push(p); }
+  // torso
+  const torsoGeo = new THREE.CapsuleGeometry(.46, .55, 8, 16); const torso = M(torsoGeo, o.shirt); torso.position.y = 1.42; torso.scale.set(1, 1, .82); G.add(torso);
+  if (o.collar) { const c = box(.5, .12, .1, o.collar, { ink: false }); c.position.set(0, 1.86, .36); G.add(c); }
+  // arms
+  const arms = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .54, 1.78, 0); const a = M(new THREE.CapsuleGeometry(.12, .52, 6, 10), o.shirt); a.position.y = -.38; p.add(a); const h = sph(.14, o.skin); h.position.y = -.76; p.add(h); p.rotation.z = s * .12; G.add(p); arms.push(p); }
+  // head
+  const hp = new THREE.Group(); hp.position.y = 2.42; G.add(hp);
+  const hg = new THREE.SphereGeometry(.56, 40, 30); hg.scale(1, 1.16, 1);
+  const head = new THREE.Mesh(hg, new THREE.MeshToonMaterial({ gradientMap: grad })); head.rotation.y = -Math.PI / 2; head.castShadow = true; ink(head, 1.035); hp.add(head);
+  for (const s of [-1, 1]) { const e = sph(.11, o.skin); e.scale.set(.6, 1, 1); e.position.set(s * .56, 0, 0); hp.add(e); }
+  // hair
+  const hc = o.hairCol;
+  if (o.hair === 'short' || o.hair === 'long' || o.hair === 'bun') { const capG = new THREE.SphereGeometry(.605, 32, 20, 0, Math.PI * 2, 0, Math.PI * .34); capG.scale(1, 1.16, 1); const cap = M(capG, hc); cap.rotation.x = -.22; hp.add(cap);
+    const bkG = new THREE.SphereGeometry(.6, 28, 18, Math.PI, Math.PI, 0, Math.PI * .66); bkG.scale(1.02, 1.17, 1.03); const back = M(bkG, hc, { ink: false }); hp.add(back); }
+  if (o.hair === 'long') { const lb = box(1.1, 1.05, .3, hc); lb.position.set(0, -.5, -.42); hp.add(lb); for (const sx of [-1, 1]) { const sd = box(.16, .95, .34, hc, { ink: false }); sd.position.set(sx * .6, -.38, -.22); hp.add(sd); }
+    }
+  if (o.hair === 'bun') { const b = sph(.26, hc); b.position.set(0, .62, -.3); hp.add(b); }
+  if (o.hair === 'bald') { for (const s of [-1, 1]) { const t = sph(.2, hc, { ink: false }); t.scale.set(.6, 1, 1.3); t.position.set(s * .5, .08, -.1); hp.add(t); } }
+  G.userData.parts = { legs, arms, hp, head, torso };
+  scene.add(G); CHARS[name] = G; return G;
+}
+function face(ch, e, look = 0) { const key = e + '|' + look; const f = ch.userData.faces; if (!f[key]) f[key] = texCanvas(512, 512, (x) => drawFace(x, e, { ...ch.userData.o, look })); const h = ch.userData.parts.head; if (h.material.map !== f[key]) { h.material.map = f[key]; h.material.needsUpdate = true; } }
+function pose(ch, p = {}) {
+  const { legs, arms, hp, torso } = ch.userData.parts; ch.visible = p.visible !== false;
+  ch.position.set(...(p.pos || [0, 0, 0])); ch.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0); ch.scale.setScalar(p.s || 1);
+  const w = p.walk; const sw = w != null ? Math.sin(w) * .55 : 0;
+  legs[0].rotation.x = sw; legs[1].rotation.x = -sw;
+  if (p.sit) { legs[0].rotation.x = legs[1].rotation.x = -1.45; }
+  arms[0].rotation.set(p.aL != null ? p.aL : -sw * .7, 0, -.12 - (p.aLz || 0)); arms[1].rotation.set(p.aR != null ? p.aR : sw * .7, 0, .12 + (p.aRz || 0));
+  hp.rotation.set(p.hx || 0, p.hy || 0, p.hz || 0); hp.position.y = 2.42 + (w != null ? Math.abs(Math.cos(w)) * .04 : 0) + (p.breath || 0);
+  face(ch, p.e || 'neutral', p.look || 0);
+}
+// ---------- overlays (2D on top of render) ----------
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function T(s, X, Y, size, col, o = {}) { o2.font = `${o.w || 800} ${size}px Poppins`; o2.textAlign = o.a || 'center'; o2.textBaseline = 'middle'; if (o.stroke) { o2.lineJoin = 'round'; o2.lineWidth = o.stroke; o2.strokeStyle = o.sc || '#1b120c'; o2.strokeText(s, X, Y); } o2.fillStyle = col; o2.fillText(s, X, Y); }
+function phoneUI(X, Y, s, o = {}) { // big phone lockscreen
+  o2.save(); o2.translate(X, Y); o2.rotate(o.rot || 0); o2.scale(s, s);
+  o2.shadowColor = 'rgba(0,0,0,.5)'; o2.shadowBlur = 50; o2.shadowOffsetY = 20; o2.fillStyle = '#16181c'; rr(o2, -260, -520, 520, 1040, 70); o2.fill(); o2.shadowColor = 'transparent';
+  const g = o2.createLinearGradient(0, -500, 0, 500); g.addColorStop(0, o.bg1 || '#2a2f6a'); g.addColorStop(1, o.bg2 || '#141633'); o2.fillStyle = g; rr(o2, -238, -496, 476, 992, 54); o2.fill();
+  o2.fillStyle = '#000'; rr(o2, -70, -480, 140, 34, 17); o2.fill();
+  if (o.time) { T(o.time, 0, -330, 130, '#fff', { w: 600 }); T(o.date || '', 0, -235, 34, 'rgba(255,255,255,.8)', { w: 600 }); }
+  if (o.notif) { const k = eback(cl(o.notif)); o2.save(); o2.translate((o.swipe || 0) * 400, -60); o2.scale(k, k); o2.fillStyle = 'rgba(255,255,255,.92)'; rr(o2, -210, -70, 420, 140, 28); o2.fill(); o2.fillStyle = '#1b120c'; rr(o2, -185, -45, 50, 50, 12); o2.fill(); T('!', -160, -20, 34, '#fff'); T('AVISO · agora', -120, -38, 24, '#555', { a: 'left', w: 600 }); T('Despeça-se.', -120, 12, 42, '#111', { a: 'left', w: 800 }); o2.restore(); }
+  if (o.empty) T('Sem notificações', 0, -40, 34, 'rgba(255,255,255,.7)', { w: 600 });
+  if (o.off) { o2.fillStyle = `rgba(0,0,0,${o.off})`; rr(o2, -238, -496, 476, 992, 54); o2.fill(); }
+  o2.restore();
+}
+function pillTag(s, X, Y, k, col = '#fff', bg = '#d8423a') { if (k <= 0) return; const kk = eback(cl(k)); o2.save(); o2.translate(X, Y); o2.scale(kk, kk); o2.rotate(-.04); o2.font = '900 64px Poppins'; const w = o2.measureText(s).width + 70; o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 20; o2.shadowOffsetY = 8; o2.fillStyle = bg; rr(o2, -w / 2, -52, w, 104, 22); o2.fill(); o2.shadowColor = 'transparent'; T(s, 0, 4, 64, col, { w: 900 }); o2.restore(); }
+function calendarUI(X, Y, s, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)) * s; o2.scale(kk, kk); o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 30; o2.shadowOffsetY = 14; o2.fillStyle = '#fffaf0'; rr(o2, -330, -330, 660, 660, 30); o2.fill(); o2.shadowColor = 'transparent'; o2.fillStyle = '#d8423a'; rr(o2, -330, -330, 660, 120, 30); o2.fill(); o2.fillRect(-330, -250, 660, 40); T('DIAS', 0, -270, 58, '#fff', { w: 900 });
+  for (let i = 0; i < 28; i++) { const cx = -250 + (i % 7) * 83, cy = -150 + Math.floor(i / 7) * 95; T('' + (i + 1), cx, cy, 34, '#3a2a20', { w: 700 }); if (i < 12 && k > .5) { o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.beginPath(); o2.moveTo(cx - 20, cy - 20); o2.lineTo(cx + 20, cy + 20); o2.moveTo(cx + 20, cy - 20); o2.lineTo(cx - 20, cy + 20); o2.stroke(); } if (i === 22) { o2.fillStyle = '#d8423a'; o2.beginPath(); o2.arc(cx, cy, 36, 0, 7); o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.stroke(); } }
+  o2.restore(); }
+function newspaperUI(X, Y, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); o2.rotate(lerp(3, -.05, eo(cl(k)))); const s = lerp(.1, 1, eo(cl(k))); o2.scale(s, s); o2.shadowColor = 'rgba(0,0,0,.4)'; o2.shadowBlur = 40; o2.shadowOffsetY = 18; o2.fillStyle = '#f5efe2'; o2.fillRect(-330, -420, 660, 840); o2.shadowColor = 'transparent'; T('O DIÁRIO', 0, -350, 54, '#1b120c', { w: 900 }); o2.fillStyle = '#1b120c'; o2.fillRect(-290, -310, 580, 5); T('AVISO', 0, -220, 110, '#1b120c', { w: 900 }); T('FALHOU?', 0, -110, 110, '#1b120c', { w: 900 }); o2.fillStyle = '#8a8a8a'; rr(o2, -280, -30, 250, 330, 10); o2.fill(); o2.fillStyle = '#2a2a2a'; rr(o2, -210, 40, 110, 190, 14); o2.fill(); o2.fillStyle = 'rgba(27,18,12,.35)'; for (let i = 0; i < 10; i++) o2.fillRect(10, -20 + i * 34, 270 - (i % 3) * 40, 14); o2.restore(); }
+function contactsUI(X, Y, k, t) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.fillStyle = '#16181c'; rr(o2, -230, -400, 460, 800, 50); o2.fill(); o2.fillStyle = '#20243a'; rr(o2, -212, -380, 424, 760, 36); o2.fill(); T('CONTATOS', 0, -320, 36, '#fff', { w: 800 }); ['Mãe', 'Bia', 'Chefe', 'Tio Zé', 'Ana', 'Rafa', 'Vó Lia'].forEach((n, i) => { const y = -230 + i * 90; o2.fillStyle = 'rgba(255,255,255,.12)'; o2.beginPath(); o2.arc(-150, y, 28, 0, 7); o2.fill(); T(n, -100, y, 34, '#fff', { a: 'left', w: 600 }); const on = (t * 2.5) % 7 > i; o2.fillStyle = on ? '#3fbf6a' : 'rgba(255,255,255,.2)'; o2.beginPath(); o2.arc(150, y, 26, 0, 7); o2.fill(); }); o2.restore(); }
+function bigClock(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); o2.font = '900 150px Poppins'; const sz = Math.min(150, 150 * 960 / o2.measureText(s).width); T(s, X, Y, sz, col, { w: 900, stroke: 18, sc: '#1b120c' }); o2.restore(); }
+
+
+function counter(s, X, Y, k, size = 160, col = '#fff') { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.font = `900 ${size}px Poppins`; const sz = Math.min(size, size * 980 / o2.measureText(s).width); T(s, 0, 0, sz, col, { w: 900, stroke: 20, sc: '#1b120c' }); o2.restore(); }
+function sub(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); T(s, X, Y, 46, col, { w: 800, stroke: 10, sc: '#1b120c' }); o2.restore(); }
+// ===== highway inside a highway =====
+const camera = new THREE.PerspectiveCamera(42, W / H, .1, 900);
+const ALL = [];
+const L3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+const blinkE = (t, e = 'neutral', seed = 0) => (((t + seed) % 3.1) < .12 ? 'blink' : e);
+const talk = (t) => (Math.floor(t * 9) % 2 ? 'talk' : 'neutral');
+function hn(t, s) { return Math.sin(t * 13.1 + s) * .5 + Math.sin(t * 27.7 + s * 2) * .3 + Math.sin(t * 5.3 + s * 3) * .2; }
+let SHAKE = 0;
+function cam(p, l, fov = 42, lt = 1) { const dd = Math.hypot(p[0] - l[0], p[1] - l[1], p[2] - l[2]) * .025; const sx = hn(lt, 1) * SHAKE + Math.sin(lt * .7) * dd, sy = hn(lt, 5) * SHAKE + Math.sin(lt * .5 + 1) * dd * .5; camera.position.set(p[0] + sx, p[1] + sy, p[2]); camera.lookAt(l[0], l[1], l[2]); camera.fov = fov * (1 + .1 * (1 - eo(cl(lt / .35)))); camera.updateProjectionMatrix(); }
+const _v = new THREE.Vector3(); function scr(x, y, z) { _v.set(x, y, z).project(camera); return [(_v.x + 1) / 2 * W, (1 - _v.y) / 2 * H]; }
+function label3d(s, x, y, z, k, col = '#1b120c', bg = '#fff', size = 44) { if (k <= 0) return; const [X, Y] = scr(x, y, z); sparkle(X, Y, k * 1.0); o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.font = `900 ${size}px Poppins`; const w = o2.measureText(s).width + 50; o2.fillStyle = bg; rr(o2, -w / 2, -size * .85, w, size * 1.7, size * .85); o2.fill(); T(s, 0, 2, size, col, { w: 900 }); o2.restore(); }
+
+// ---------- world ----------
+scene.background = new THREE.Color(0x9fd0ea);
+const ground = box(900, .2, 900, 0x7fc24e, { ink: false }); ground.position.set(0, -.1, -200); scene.add(ground);
+// hills + city skyline far away
+for (let i = 0; i < 18; i++) { const h = M(new THREE.SphereGeometry(30 + (i % 4) * 8, 16, 10), [0x6fb244, 0x5fa23a, 0x7fc24e][i % 3], { ink: false }); h.scale.y = .45; h.position.set((i % 2 ? 1 : -1) * (90 + (i * 37) % 120), -6, -40 - i * 30); scene.add(h); }
+const CITY = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat(0xffffff), 140); { const m = new THREE.Matrix4(); let s = 3; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; for (let i = 0; i < 140; i++) { const x = -110 + rnd() * 220, z = -420 - rnd() * 80, h = 12 + rnd() * 50; m.compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(6 + rnd() * 6, h, 6 + rnd() * 6)); CITY.setMatrixAt(i, m); CITY.setColorAt(i, new THREE.Color().setHSL(.58, .12, .62 + rnd() * .25)); } } scene.add(CITY);
+const TREES = new THREE.InstancedMesh(new THREE.ConeGeometry(1.6, 4.5, 7), mat(0x3f8a3a), 260); { const m = new THREE.Matrix4(); let s = 9; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; for (let i = 0; i < 260; i++) { const side = i % 2 ? 1 : -1; const x = side * (42 + rnd() * 80), z = 40 - rnd() * 420; m.makeTranslation(x, 2.25, z); TREES.setMatrixAt(i, m); } } scene.add(TREES);
+// ---------- road pieces ----------
+function roadTex(lanes, tint) { const t = texCanvas(256, 512, (x) => { x.fillStyle = tint || '#4a4b52'; x.fillRect(0, 0, 256, 512); x.fillStyle = 'rgba(0,0,0,.06)'; for (let i = 0; i < 400; i++) x.fillRect((i * 97) % 256, (i * 173) % 512, 3, 3); const lw = 256 / lanes; x.fillStyle = '#f3f3f3'; x.fillRect(4, 0, 6, 512); x.fillStyle = '#f2c12e'; x.fillRect(246, 0, 6, 512); x.fillStyle = '#f3f3f3'; for (let k = 1; k < lanes; k++) for (let y = 0; y < 512; y += 128) x.fillRect(k * lw - 3, y, 6, 64); }); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; }
+const RL = 520, RZ = -200; // road length & center z
+function roadway(lanes, tint) { const tex = roadTex(lanes, tint); tex.repeat.set(1, RL / 14); const m = new THREE.Mesh(new THREE.PlaneGeometry(lanes * 3.5, RL), new THREE.MeshToonMaterial({ map: tex, gradientMap: grad })); m.rotation.x = -Math.PI / 2; m.receiveShadow = true; m.position.set(0, .03, RZ); scene.add(m); return m; }
+const NARROW = roadway(2); NARROW.position.x = 0;
+const IN_N2 = roadway(2), IN_S2 = roadway(2), IN_N3 = roadway(3), IN_S3 = roadway(3); IN_S2.rotation.z = IN_S3.rotation.z = Math.PI;
+const OUT_N2 = roadway(2), OUT_S2 = roadway(2), OUT_N3 = roadway(3), OUT_S3 = roadway(3); OUT_S2.rotation.z = OUT_S3.rotation.z = Math.PI;
+const EXP_N = roadway(3, '#b89a2e'), EXP_S = roadway(3, '#b89a2e'), LOC_N = roadway(3, '#3f6fa8'), LOC_S = roadway(3, '#3f6fa8'); EXP_S.rotation.z = LOC_S.rotation.z = Math.PI;
+const ROADS = [NARROW, IN_N2, IN_S2, IN_N3, IN_S3, OUT_N2, OUT_S2, OUT_N3, OUT_S3, EXP_N, EXP_S, LOC_N, LOC_S];
+// Jersey barrier
+const jsh = new THREE.Shape([new THREE.Vector2(-.45, 0), new THREE.Vector2(.45, 0), new THREE.Vector2(.25, .3), new THREE.Vector2(.12, 1.0), new THREE.Vector2(-.12, 1.0), new THREE.Vector2(-.25, .3)]); const jg = new THREE.ExtrudeGeometry(jsh, { depth: RL, bevelEnabled: false }); jg.translate(0, 0, -RL / 2); const JERSEY = new THREE.Mesh(jg, mat(0xd9d4c8)); JERSEY.position.set(0, 0, RZ); JERSEY.castShadow = true; scene.add(JERSEY);
+// toll plaza at z = -40
+const TOLL = new THREE.Group(); { const can = box(30, .8, 7, 0xf3f0e8); can.position.y = 6; TOLL.add(can); const stripe = box(30.2, .3, 7.2, 0xd8423a, { ink: false }); stripe.position.y = 6.3; TOLL.add(stripe); for (let i = 0; i < 6; i++) { const x = -12.5 + i * 5; const b = box(1.6, 2.6, 3, 0xe9e2d0); b.position.set(x, 1.3, 0); TOLL.add(b); const p = box(.3, 5.6, .3, 0xbfbfbf); p.position.set(x, 3, 0); TOLL.add(p); const bar = box(3.2, .14, .14, 0xd8423a, { ink: false }); bar.geometry.translate(1.6, 0, 0); bar.position.set(x + .8, 1.4, -1.6); TOLL.add(bar); TOLL.userData['bar' + i] = bar; } const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.2), new THREE.MeshBasicMaterial({ map: texCanvas(500, 60, (g) => { g.fillStyle = '#2e8a4f'; g.fillRect(0, 0, 500, 60); g.fillStyle = '#fff'; g.font = '900 44px Poppins'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('PEDÁGIO', 250, 32); }) })); sg.position.set(0, 6.1, 3.62); TOLL.add(sg); } TOLL.position.set(0, 0, -40); scene.add(TOLL);
+// swamp + bridge near the city (z -300 .. -360)
+const SWAMP = new THREE.Mesh(new THREE.BoxGeometry(160, .3, 70), mat(0x6fb8a8, { transparent: true, opacity: .92 })); SWAMP.position.set(0, -.05, -330); scene.add(SWAMP);
+const REEDS = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .06, 1.6, 4), mat(0x4f7a2a), 400); { const m = new THREE.Matrix4(); let s = 21; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; for (let i = 0; i < 400; i++) { m.makeTranslation(-75 + rnd() * 150, .7, -298 - rnd() * 64); REEDS.setMatrixAt(i, m); } } scene.add(REEDS);
+const SAND = M(new THREE.BoxGeometry(40, 1, 30), 0xe6c48a); SAND.position.set(0, -.6, -315); scene.add(SAND);
+const BRIDGE = new THREE.Group(); { const d = box(22, .8, 36, 0x9a9a9e); d.position.y = 3; BRIDGE.add(d); for (let i = 0; i < 5; i++) for (const s of [-8, 8]) { const p = cyl(.7, .7, 3, 0xbfbfc4); p.position.set(s, 1.3, -14 + i * 7); BRIDGE.add(p); } const rd = new THREE.Mesh(new THREE.PlaneGeometry(20, 36), new THREE.MeshToonMaterial({ map: (() => { const t = roadTex(4); t.repeat.set(1, 3); return t; })(), gradientMap: grad })); rd.rotation.x = -Math.PI / 2; rd.position.y = 3.42; BRIDGE.add(rd); } BRIDGE.position.set(0, 0, -345); scene.add(BRIDGE);
+// pastel + sugarcane stand next to the road (outer side) at z -120
+const STAND = new THREE.Group(); { const base = box(6, 1.2, 3, 0xf3e6c8); base.position.y = .6; STAND.add(base); const cnt = box(6.2, .15, 3.2, 0xd8b26a); cnt.position.y = 1.25; STAND.add(cnt); for (const x of [-2.9, 2.9]) for (const z of [-1.4, 1.4]) { const p = box(.15, 3.2, .15, 0x8a5a33); p.position.set(x, 1.6, z); STAND.add(p); } const aw = new THREE.Mesh(new THREE.BoxGeometry(6.8, .2, 3.8), new THREE.MeshToonMaterial({ gradientMap: grad, map: texCanvas(256, 64, (g) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#fff' : '#2e9e5b'; g.fillRect(i * 32, 0, 32, 64); } }) })); aw.position.y = 3.3; STAND.add(aw); const sg = new THREE.Mesh(new THREE.PlaneGeometry(4.4, .8), new THREE.MeshBasicMaterial({ map: texCanvas(440, 80, (g) => { g.fillStyle = '#f2c12e'; g.fillRect(0, 0, 440, 80); g.fillStyle = '#8a3a1a'; g.font = '900 40px Poppins'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('PASTEL & CALDO', 220, 42); }) })); sg.position.set(0, 2.75, 1.65); STAND.add(sg); for (let i = 0; i < 3; i++) { const p = sph(.28, 0xe9b25a); p.scale.set(1.3, .4, .8); p.position.set(-1.6 + i * .7, 1.45, .6); STAND.add(p); } const press = box(.9, 1.0, .7, 0x2e8a4f); press.position.set(1.8, 1.85, .2); STAND.add(press); const cane = cyl(.05, .05, 1.6, 0x9ab84a, { ink: false }); cane.rotation.z = .5; cane.position.set(2.4, 2.2, .3); STAND.add(cane); for (let i = 0; i < 2; i++) { const cup = cyl(.1, .08, .3, 0xd8e86a, { ink: false }); cup.position.set(.6 + i * .3, 1.48, .8); STAND.add(cup); } } STAND.position.set(36, 0, -120); STAND.rotation.y = -Math.PI / 2; scene.add(STAND);
+// ---------- life: clouds, sand grains ----------
+const CLOUDS = new THREE.Group(); scene.add(CLOUDS); { const cm = mat(0xffffff); for (let i = 0; i < 16; i++) { const g = new THREE.Group(); for (let k = 0; k < 5; k++) { const sp = new THREE.Mesh(new THREE.SphereGeometry(4 + (k % 3) * 1.5, 12, 10), cm); sp.position.set((k - 2) * 4.5, (k % 2) * 1.6, (k % 3) * 1.5); g.add(sp); } g.position.set(-160 + (i * 53) % 320, 55 + (i % 4) * 9, -60 - (i * 37) % 360); g.userData.sp = .8 + (i % 3) * .4; CLOUDS.add(g); } }
+const GRAINS = new THREE.InstancedMesh(new THREE.SphereGeometry(.28, 6, 5), mat(0xe6c48a), 260); scene.add(GRAINS); GRAINS.count = 0;
+function sandPour(t, a, b) { if (t < a || t > b) { GRAINS.count = 0; return; } const m = new THREE.Matrix4(); let k = 0; for (const [x0, z0] of [[-6, -300], [7, -302]]) for (let i = 0; i < 120; i++) { const ph = ((t - a) * 1.4 + i / 120) % 1; const x = x0 + (x0 < 0 ? 1 : -1) * (2 + ph * 6) + Math.sin(i * 7.1) * 1.2, y = 4 - ph * ph * 4.5, z = z0 + Math.cos(i * 3.3) * 1.5; m.makeTranslation(x, Math.max(.1, y), z); GRAINS.setMatrixAt(k++, m); } GRAINS.count = k; GRAINS.instanceMatrix.needsUpdate = true; }
+function speedLines(k, t) { if (k <= 0) return; o2.save(); o2.strokeStyle = `rgba(255,255,255,${.35 * k})`; o2.lineWidth = 4; for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2 + Math.sin(i * 9.3) * .1; const r0 = 380 + ((t * 900 + i * 97) % 500); o2.beginPath(); o2.moveTo(W / 2 + Math.cos(a) * r0, H / 2 + Math.sin(a) * r0); o2.lineTo(W / 2 + Math.cos(a) * (r0 + 160), H / 2 + Math.sin(a) * (r0 + 160)); o2.stroke(); } o2.restore(); }
+function sparkle(X, Y, k) { if (k <= 0 || k >= 1) return; o2.save(); o2.translate(X, Y); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const r = 40 + k * 160; o2.globalAlpha = 1 - k; o2.fillStyle = ['#fff6a0', '#ffffff', '#ffd23f'][i % 3]; o2.save(); o2.translate(Math.cos(a) * r, Math.sin(a) * r); o2.rotate(a); o2.beginPath(); o2.moveTo(0, -14); o2.lineTo(4, 0); o2.lineTo(0, 14); o2.lineTo(-4, 0); o2.closePath(); o2.fill(); o2.restore(); } o2.restore(); }
+function dust(X, Y, k, n = 14) { if (k <= 0 || k >= 1) return; o2.save(); for (let i = 0; i < n; i++) { const a = -Math.PI + (i / (n - 1)) * Math.PI; const r = 30 + k * 220; o2.fillStyle = `rgba(230,220,200,${.7 * (1 - k)})`; o2.beginPath(); o2.arc(X + Math.cos(a) * r, Y + Math.sin(a) * r * .4, 20 + k * 40, 0, 7); o2.fill(); } o2.restore(); }
+function birds(t) { o2.save(); o2.strokeStyle = 'rgba(40,40,60,.55)'; o2.lineWidth = 4; o2.lineCap = 'round'; for (let i = 0; i < 5; i++) { const x = ((t * 40 + i * 70) % (W + 300)) - 150, y = 260 + i * 22 + Math.sin(t * 2 + i) * 10, f = Math.sin(t * 10 + i) * 10; o2.beginPath(); o2.moveTo(x - 18, y - f); o2.quadraticCurveTo(x - 8, y - 8, x, y); o2.quadraticCurveTo(x + 8, y - 8, x + 18, y - f); o2.stroke(); } o2.restore(); }
+function sunGlow() { const g = o2.createRadialGradient(880, 180, 10, 880, 180, 420); g.addColorStop(0, 'rgba(255,245,200,.55)'); g.addColorStop(1, 'rgba(255,245,200,0)'); o2.fillStyle = g; o2.fillRect(0, 0, W, H); o2.fillStyle = 'rgba(255,250,225,.95)'; o2.beginPath(); o2.arc(880, 180, 60, 0, 7); o2.fill(); }
+// ---------- vehicles ----------
+const CARB = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, .8, 4), mat(0xffffff), 700), CARC = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, .65, 2), mat(0xd8ecf6), 700); CARB.castShadow = true; scene.add(CARB, CARC);
+const TRKC = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 2.2, 2.2), mat(0xffffff), 120), TRKT = new THREE.InstancedMesh(new THREE.BoxGeometry(2.5, 2.8, 9), mat(0xf3f3f3), 120); TRKC.castShadow = TRKT.castShadow = true; scene.add(TRKC, TRKT);
+const CCOL = [0xd8423a, 0x3f7fb3, 0xf2c12e, 0x2e9e5b, 0x8e5ba8, 0xf07a2a, 0xffffff, 0x2a2a2a, 0x4fd1e8, 0xe86aa0]; { for (let i = 0; i < 700; i++) CARB.setColorAt(i, new THREE.Color(CCOL[i % CCOL.length])); for (let i = 0; i < 120; i++) TRKC.setColorAt(i, new THREE.Color([0x2e8a4f, 0xd8423a, 0x3f7fb3, 0xf2c12e][i % 4])); }
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1);
+// lanes: list of {x, dir(-1 away, +1 toward camera), kind:'car'|'truck'|'any'}
+function laneSet(cfg) { const L = []; const add = (x0, n, dir, kind) => { for (let k = 0; k < n; k++) L.push({ x: x0 + (k + .5) * 3.5 * (dir < 0 ? 1 : -1), dir, kind }); };
+  if (cfg.narrow) { L.push({ x: 1.75, dir: -1, kind: 'any' }, { x: -1.75, dir: 1, kind: 'any' }); return L; }
+  add(1.5, cfg.inner, -1, cfg.split ? 'car' : 'any'); add(-1.5, cfg.inner, 1, cfg.split ? 'car' : 'any');
+  if (cfg.outer) { add(1.5 + cfg.inner * 3.5 + 4, cfg.outer, -1, cfg.split ? 'truck' : 'any'); add(-1.5 - cfg.inner * 3.5 - 4, cfg.outer, 1, cfg.split ? 'truck' : 'any'); } return L; }
+function traffic(t, cfg) { const lanes = laneSet(cfg); const dens = cfg.dens || .3; const speed = cfg.speed == null ? 14 : cfg.speed; let ci = 0, ti = 0;
+  lanes.forEach((ln, li) => { const n = Math.floor(dens * 60); for (let j = 0; j < n; j++) { const seed = li * 131 + j * 17; const truck = ln.kind === 'truck' ? (j % 2 === 0) : ln.kind === 'car' ? false : (seed % 7 === 0);
+      const spacing = RL / n; let z = RZ + RL / 2 - ((j * spacing + (seed % 13) * .7 + (speed * (1 + (seed % 5) * .08)) * t * (ln.dir < 0 ? 1 : -1)) % RL + RL) % RL; if (ln.dir > 0) z = RZ * 2 - z;
+      if (cfg.zmin != null && (z < cfg.zmin || z > cfg.zmax)) continue;
+      const rot = ln.dir < 0 ? 0 : Math.PI; _q.setFromEuler(new THREE.Euler(0, rot, 0));
+      if (truck && ti < 120) { _p.set(ln.x, 1.35, z - ln.dir * 1.5 * -1); _m.compose(_p, _q, _s); TRKC.setMatrixAt(ti, _m); _p.set(ln.x, 1.6, z + (ln.dir < 0 ? 5.8 : -5.8)); _m.compose(_p, _q, _s); TRKT.setMatrixAt(ti, _m); ti++; }
+      else if (ci < 700) { const bz = Math.abs(Math.sin(t * 11 + seed)) * (speed > 0 ? .07 : 0); _p.set(ln.x, .55 + bz, z); _m.compose(_p, _q, _s); CARB.setMatrixAt(ci, _m); _p.set(ln.x, 1.25 + bz, z + (ln.dir < 0 ? .3 : -.3)); _m.compose(_p, _q, _s); CARC.setMatrixAt(ci, _m); ci++; } } });
+  CARB.count = CARC.count = ci; TRKC.count = TRKT.count = ti; [CARB, CARC, TRKC, TRKT].forEach(m => m.instanceMatrix.needsUpdate = true); }
+// hero car (convertible) with egg-head driver
+function carG(col) { const g = new THREE.Group(); const b = box(2.0, .9, 4.2, col); b.position.y = .75; g.add(b); const hd = box(2.0, .3, 1.4, col); hd.position.set(0, 1.25, -1.4); g.add(hd); const ws = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .7), new THREE.MeshBasicMaterial({ color: 0xd8ecf6, side: THREE.DoubleSide })); ws.position.set(0, 1.6, -.7); ws.rotation.x = -.4; g.add(ws); for (const z of [-1.4, 1.4]) for (const s of [-1, 1]) { const w = cyl(.42, .42, .3, 0x1e1e1e); w.rotation.z = Math.PI / 2; w.position.set(s * 1.0, .42, z); g.add(w); } for (const s of [-.6, .6]) { const hl = sph(.14, 0xfff6c9, { ink: false }); hl.position.set(s, .9, -2.1); g.add(hl); } scene.add(g); ALL.push(g); return g; }
+const HERO = carG(0xd8423a), CAR2 = carG(0xf2c12e);
+const DRIVER = makeChar('drv', { skin: '#E8B48C', hair: 'short', hairCol: 0x2a1a12, shirt: 0x3f7fb3, pants: 0x2f3d5c, iris: '#4a2a14' }); HERO.add(DRIVER); DRIVER.scale.setScalar(.55); DRIVER.position.set(0, .35, .2); DRIVER.rotation.y = Math.PI;
+const DRV2 = makeChar('drv2', { skin: '#C98F67', hair: 'short', hairCol: 0x141010, shirt: 0xf07a2a, pants: 0x2f3d5c }); CAR2.add(DRV2); DRV2.scale.setScalar(.55); DRV2.position.set(0, .35, .2); DRV2.rotation.y = Math.PI;
+function bigTruck(col) { const g = new THREE.Group(); const c = box(2.5, 2.4, 2.4, col); c.position.set(0, 1.6, -5.2); g.add(c); const ws = new THREE.Mesh(new THREE.PlaneGeometry(2.1, .9), new THREE.MeshBasicMaterial({ color: 0xd8ecf6 })); ws.position.set(0, 2.2, -6.42); ws.rotation.y = Math.PI; g.add(ws); const tr = box(2.6, 3.0, 9, 0xf3f3f3); tr.position.set(0, 2.0, .9); g.add(tr); const st = box(2.62, .4, 9.02, col, { ink: false }); st.position.set(0, 1.0, .9); g.add(st); for (const z of [-5, -.5, 2, 4]) for (const s of [-1, 1]) { const w = cyl(.55, .55, .4, 0x1e1e1e); w.rotation.z = Math.PI / 2; w.position.set(s * 1.25, .55, z); g.add(w); } scene.add(g); ALL.push(g); return g; }
+const TRUCK1 = bigTruck(0x2e8a4f), MUDTRUCK = bigTruck(0xf2a12e), DUMP1 = bigTruck(0xf2c12e), DUMP2 = bigTruck(0xf2c12e);
+const ATT = makeChar('att', { skin: '#8E5A38', hair: 'short', hairCol: 0x141010, shirt: 0x2e8a4f, pants: 0x2a2a3a }); ALL.push(ATT);
+const VEND = makeChar('vend', { skin: '#C98F67', hair: 'short', hairCol: 0x241812, shirt: 0xf2c12e, pants: 0x3a4a6a }); ALL.push(VEND); { const bx = box(.9, .5, .6, 0x3f7fb3); bx.position.set(0, 1.5, .55); VEND.add(bx); for (let i = 0; i < 4; i++) { const bt = cyl(.07, .07, .4, 0x9fd8f6, { ink: false }); bt.position.set(-.3 + i * .2, 1.9, .55); VEND.add(bt); } }
+const COOK = makeChar('cook', { skin: '#F1C7A3', hair: 'bun', hairCol: 0x3a2416, shirt: 0xffffff, pants: 0x3a3a4a, lashes: true }); ALL.push(COOK);
+
+// ---------- stage config (road evolves over time) ----------
+function roadState(t) { if (t < 1.7) return { narrow: false, inner: 3, outer: 3, split: true, jersey: 1, tintE: 0, tintL: 0, noToll: true, outerGrow: 1, gIn: 1, wIn: 1, wOut: 1 };
+  const s = { narrow: t < 5.84, inner: t < 27.0 ? 2 : 3, outer: 0, split: false, jersey: 0, tintE: 0, tintL: 0, noToll: t > 28.3, gIn: eback(prog(t, 5.84, 7.0)), wIn: t < 27 ? 1 : lerp(.67, 1, eback(prog(t, 27.0, 27.8))), wOut: t < 59 ? 1 : lerp(.67, 1, eback(prog(t, 59.0, 59.8))) };
+  if (t >= 36.0) s.outer = t < 59.0 ? 2 : 3; if (t >= 39.6 && t < 46.35) { s.tintE = 1; if (t >= 41.8) s.tintL = 1; } if (t >= 39.6) s.split = true; s.jersey = eback(prog(t, 50.3, 51.1)); s.outerGrow = eo(prog(t, 35.26, 37.6)); return s; }
+function applyRoad(s) { ROADS.forEach(r => r.visible = false); if (s.narrow) { NARROW.visible = true; } else {
+    const wi = s.inner * 3.5; const N = s.inner === 2 ? IN_N2 : IN_N3, S = s.inner === 2 ? IN_S2 : IN_S3; N.visible = S.visible = !s.tintE; N.position.x = 1.5 + wi * s.wIn / 2; S.position.x = -1.5 - wi * s.wIn / 2; for (const r of [N, S]) { r.scale.x = s.wIn; r.scale.y = Math.max(.001, Math.min(1.15, s.gIn)); r.position.z = RZ + RL / 2 * (1 - Math.min(1, s.gIn)); } if (s.tintE) { EXP_N.visible = EXP_S.visible = true; EXP_N.position.x = 1.5 + 5.25; EXP_S.position.x = -1.5 - 5.25; }
+    if (s.outer) { const wo = s.outer * 3.5; const ON = s.outer === 2 ? OUT_N2 : OUT_N3, OS = s.outer === 2 ? OUT_S2 : OUT_S3; const g = s.outerGrow; for (const [r, sx] of [[ON, 1], [OS, -1]]) { r.visible = !s.tintL; r.scale.y = Math.max(.001, g); r.scale.x = s.wOut; r.position.z = RZ + RL / 2 * (1 - g); r.position.x = sx * (1.5 + wi + 4 + wo * s.wOut / 2); } if (s.tintL) { LOC_N.visible = LOC_S.visible = true; LOC_N.position.x = 1.5 + wi + 4 + wo / 2; LOC_S.position.x = -(1.5 + wi + 4 + wo / 2); LOC_N.scale.y = LOC_S.scale.y = 1; LOC_N.position.z = LOC_S.position.z = RZ; } } }
+  JERSEY.visible = s.jersey > 0; JERSEY.scale.y = Math.max(.01, s.jersey); TOLL.visible = !s.narrow && !s.noToll; }
+function hideAll() { ALL.forEach(c => c.visible = false); [CARB, CARC, TRKC, TRKT].forEach(m => m.count = 0); }
+function tbar(i, k) { TOLL.userData['bar' + i].rotation.z = k * 1.4; }
+
+// ---------- shots ----------
+const SH = []; const shot = (t0, fn) => SH.push({ t0, fn });
+// HOOK teaser: the monster road from above
+shot(0, (t, lt) => { traffic(t, { inner: 3, outer: 3, split: true, dens: .45, speed: 14 }); const k = eio(cl(lt / 1.7)); SHAKE = .05; cam(L3([0, 90, 60], [0, 30, 14], k), [0, 0, -60], 50, lt); SH.ov = () => { speedLines(1 - k, t); counter('COMO ISSO NASCEU?', W / 2, 330, prog(t, .05, .35), 110, '#fff'); }; });
+// A São Paulo → Rio on a narrow two-way road, stuck behind a truck
+shot(1.7, (t, lt) => { const z = -60 - lt * 6; HERO.visible = TRUCK1.visible = true; HERO.position.set(1.75, 0, z + 9); HERO.rotation.y = 0; TRUCK1.position.set(1.75, 0, z); TRUCK1.rotation.y = 0; pose(DRIVER, { e: t > 3.0 ? 'tired' : 'neutral', aL: -1.2, aR: -1.2, hz: Math.sin(t * 2) * .05 }); DRIVER.position.set(0, .35, .2); DRIVER.rotation.y = Math.PI;
+  traffic(t, { narrow: true, dens: .12 }); SHAKE = .015; if (t < 2.9) cam([5, 3.6, z + 18], [1.75, 1.4, z + 4], 44, lt); else cam([3.2, 2.8, z + 16.5], [1.75, 2.0, z + 2], 44, lt - 2.9);
+  SH.ov = () => { counter('SÃO PAULO → RIO', W / 2, 300, prog(t, .3, .7), 100, '#fff'); if (t > 3.0) pillTag('COLADO NO CAMINHÃO', W / 2, 1640, prog(t, 4.32, 4.6), '#fff', '#d8423a'); }; });
+// B you open a wide highway, and you pay for it — at the toll
+shot(5.84, (t, lt) => { TOLL.position.y = lerp(30, 0, eback(prog(t, 8.3, 9.2))); traffic(t, { inner: 2, dens: .18 }); SHAKE = 0; const k = eio(cl(lt / 4.4)); cam(L3([24, 26, 10], [18, 18, -6], k), [0, 0, -40], 44, lt);
+  SH.ov = () => { speedLines(1 - prog(t, 5.84, 7.0), t); counter('RODOVIA LARGONA', W / 2, 300, prog(t, 6.64, 7.0), 110, '#fff'); if (t > 8.3) counter('PEDÁGIO', W / 2, 430, prog(t, 9.36, 9.7), 120, '#f6d33c'); if (t > 9.1 && t < 9.9) { const [X, Y] = scr(0, 0, -40); dust(X, Y, prog(t, 9.1, 9.9), 18); } }; });
+// C the toll road: car passes the booth, barrier up
+shot(10.25, (t, lt) => { traffic(t, { inner: 2, dens: .1, zmin: -400, zmax: -50 }); HERO.visible = true; const z = lerp(-26, -52, eio(cl(lt / 1.6))); HERO.position.set(4.75 - 1.75 + 1.25, 0, z); HERO.rotation.y = 0; pose(DRIVER, { e: 'smile', aL: -1.2, aR: -1.2 }); DRIVER.position.set(0, .35, .2); DRIVER.rotation.y = Math.PI;
+  tbar(3, eio(prog(t, 10.4, 10.9))); ATT.visible = true; pose(ATT, { pos: [2.5 - 1.0, .3, -40], ry: Math.PI / 2, aR: -1.4, e: 'smile' }); SHAKE = 0; cam([10, 4.2, -18], [3.5, 1.8, -40], 40, lt); SH.ov = () => { o2.save(); for (let i = 0; i < 4; i++) { const p = prog(t, 10.4 + i * .08, 11.0 + i * .08); if (p <= 0 || p >= 1) continue; o2.fillStyle = '#f2c12e'; o2.strokeStyle = '#8a6a10'; o2.lineWidth = 4; o2.beginPath(); o2.arc(540 + i * 60, 900 - p * 400, 26, 0, 7); o2.fill(); o2.stroke(); } o2.restore(); }; });
+// D near the city: the road hits a swamp so soft it swallows a truck
+shot(11.93, (t, lt) => { traffic(t, { inner: 2, dens: .08, zmin: -300, zmax: 40 }); MUDTRUCK.visible = true; MUDTRUCK.position.set(-30, -eio(prog(t, 13.6, 15.6)) * 2.6, -312); MUDTRUCK.rotation.set(0, .5, eio(prog(t, 13.6, 15.6)) * .18); SAND.position.y = -.6; SHAKE = 0; const k = eio(cl(lt / 4)); cam(L3([4, 14, -262], [-10, 8, -288], k), [-26, 0, -312], 42, lt);
+  SH.ov = () => { counter('BREJÃO', W / 2, 300, prog(t, 13.69, 14.0), 140, '#6fb8a8'); if (t > 14.8) sub('ENGOLE ATÉ CAMINHÃO', W / 2, 430, prog(t, 14.81, 15.1), '#fff'); }; });
+// E fill the swamp with sand until firm
+shot(15.93, (t, lt) => { traffic(t, { inner: 2, dens: .08, zmin: -300, zmax: 40 }); MUDTRUCK.visible = true; MUDTRUCK.position.set(-30, -2.6, -312); MUDTRUCK.rotation.set(0, .5, .18); DUMP1.visible = DUMP2.visible = true; DUMP1.position.set(-6, 0, -300); DUMP1.rotation.set(0, Math.PI * .5, 0); DUMP2.position.set(7, 0, -302); DUMP2.rotation.set(0, -Math.PI * .5, 0);
+  SAND.position.y = lerp(-.6, .05, eio(prog(t, 16.3, 18.0))); sandPour(t, 16.0, 18.2); SHAKE = .02; const kk = eio(cl(lt / 2.4)); cam(L3([22, 12, -272], [14, 8, -290], kk), [0, 0, -312], 42, lt); SH.ov = () => counter('AREIA', W / 2, 300, prog(t, 17.29, 17.6), 150, '#e6c48a'); });
+// F where not even that works, the road becomes a bridge
+shot(18.33, (t, lt) => { traffic(t, { inner: 2, dens: .08, zmin: -320, zmax: 40 }); SAND.position.y = .05; BRIDGE.position.y = lerp(-6, 0, eback(prog(t, 18.6, 19.8))); SHAKE = 0; const kk = eio(cl(lt / 2.4)); cam(L3([30, 4, -318], [22, 12, -330], kk), [0, 2, -345], 40, lt); SH.ov = () => counter('VIRA PONTE', W / 2, 300, prog(t, 19.93, 20.2), 130, '#fff'); });
+// G it links the two biggest cities: soon it becomes a parking lot
+shot(20.73, (t, lt) => { SAND.position.y = .05; const jam = t > 23.9; traffic(jam ? 0 : t, { inner: 2, dens: jam ? 1.0 : lerp(.3, .9, prog(t, 20.8, 23.9)), speed: jam ? 0 : 10 }); SHAKE = 0; const k = eio(cl(lt / 4.4)); cam(L3([0, 60, 40], [0, 34, 20], k), [0, 0, -120], 46, lt);
+  SH.ov = () => { if (t > 24.0) counter('ESTACIONAMENTO', W / 2, 330, prog(t, 24.33, 24.6), 110, '#ff6a5a'); else sub('AS DUAS MAIORES CIDADES', W / 2, 330, prog(t, 21.6, 21.9)); }; });
+// H widen until three lanes each side
+shot(25.13, (t, lt) => { SAND.position.y = .05; traffic(t, { inner: t < 27.0 ? 2 : 3, dens: .5, speed: t < 27 ? 2 : 10 }); SHAKE = t > 26.9 && t < 27.3 ? .35 : 0; const kk = eio(cl(lt / 3.2)); cam(L3([-14, 30, 16], [10, 22, 6], kk), [0, 0, -40], 46, lt); SH.ov = () => counter((t < 27 ? 2 : 3) + ' FAIXAS', W / 2, 330, prog(t, 25.6, 25.9), 150, '#fff'); });
+// I cars and trucks fight: slow truck, car weaving, a fender bender stops everything
+shot(28.3, (t, lt) => { const crash = t > 33.5; const z0 = -80 - lt * (crash ? 0 : 5) - (crash ? 26 : 0); TRUCK1.visible = HERO.visible = CAR2.visible = true; TRUCK1.position.set(1.5 + 5.25 + 3.5, 0, z0); TRUCK1.rotation.y = 0;
+  const weave = Math.sin(lt * 1.6); HERO.position.set(1.5 + 5.25 + weave * 3.2, 0, z0 - 10 + (crash ? 0 : 0)); HERO.rotation.set(0, -Math.cos(lt * 1.6) * .25, 0); CAR2.position.set(1.5 + 5.25 - 3.5, 0, z0 - 15.5); CAR2.rotation.y = 0;
+  pose(DRIVER, { e: crash ? 'shock' : 'smile', aL: -1.2, aR: -1.2 }); DRIVER.position.set(0, .35, .2); DRIVER.rotation.y = Math.PI; pose(DRV2, { e: crash ? 'angry' : 'neutral', aL: -1.2, aR: -1.2, hy: crash ? 2.6 : 0 }); DRV2.position.set(0, .35, .2); DRV2.rotation.y = Math.PI;
+  if (crash) { HERO.position.set(1.5 + 5.25 - 3.5, 0, z0 - 10.6); CAR2.position.set(1.5 + 5.25 - 3.5, 0, z0 - 15.2); HERO.rotation.y = .3; }
+  traffic(crash ? 0 : t, { inner: 3, dens: .2, speed: crash ? 0 : 10, zmin: -400, zmax: z0 - 40 }); SHAKE = crash && t < 34 ? .2 : .01; cam([18, 9, z0 + 14], [5, 1, z0 - 8], 42, lt);
+  SH.ov = () => { if (!crash) { label3d('DEVAGARINHO', TRUCK1.position.x, 5.5, z0, prog(t, 30.6, 30.9), '#fff', '#2e8a4f', 36); label3d('COSTURANDO', HERO.position.x, 3.2, HERO.position.z, prog(t, 31.9, 32.2), '#fff', '#d8423a', 36); } else { T('CRASH!', W / 2, 760, 110, '#fff', { w: 900, stroke: 16 }); counter('PARA TUDO', W / 2, 330, prog(t, 34.22, 34.5), 130, '#ff6a5a'); } }; });
+// J build another full highway outside: inner = express (cars), outer = local (trucks)
+shot(34.78, (t, lt) => { const st = roadState(t); traffic(t, { inner: 3, outer: st.outer ? 2 : 0, split: t > 39.6, dens: .22, speed: 12 }); SHAKE = 0; const k = eio(cl(lt / 6.7)); cam(L3([0, 40, 26], [0, 30, 14], k), [0, 0, -60], 50, lt);
+  SH.ov = () => { if (t < 39.6) counter('OUTRA RODOVIA', W / 2, 300, prog(t, 36.38, 36.7), 110, '#fff'); else { label3d('EXPRESSA', 6.75, 1, -20, prog(t, 39.98, 40.3), '#1b120c', '#f2c12e'); if (t > 41.8) label3d('LOCAL', 23.5 + 2, 1, -20, prog(t, 42.14, 42.45), '#fff', '#3f6fa8'); sub('SÓ CARRO', W / 2, 300, prog(t, 40.86, 41.1), '#f2c12e'); } }; });
+// K express and local — like the Marginal
+shot(43.58, (t, lt) => { traffic(t, { inner: 3, outer: 2, split: true, dens: .25, speed: 12 }); SHAKE = 0; const kk = eio(cl(lt / 2.8)); cam(L3([-34, 9, 0], [-20, 14, -30], kk), [10, 0, -70], 44, lt); SH.ov = () => { counter('EXPRESSA E LOCAL', W / 2, 300, prog(t, 44.22, 44.5), 110, '#fff'); if (t > 45.2) sub('IGUAL NA MARGINAL', W / 2, 430, prog(t, 45.26, 45.5), '#f6d33c'); }; });
+// L there's always a smart guy cutting through the median
+shot(46.35, (t, lt) => { traffic(t, { inner: 3, outer: 2, split: true, dens: .18, speed: 12, zmin: -400, zmax: -70 }); CAR2.visible = true; const p = eio(prog(t, 47.3, 49.4)); const x = lerp(1.5 + 3.5 * 2.5, 1.5 + 10.5 + 4 + 1.75, p); CAR2.position.set(x, 0, -40 - lt * 6); CAR2.rotation.y = -p * (1 - p) * 2.4; pose(DRV2, { e: 'smile', aL: -1.2, aR: -1.2 }); DRV2.position.set(0, .35, .2); DRV2.rotation.y = Math.PI;
+  SHAKE = 0; cam([x - 2, 4.5, CAR2.position.z + 14], [x + 2, 1, CAR2.position.z - 2], 44, lt); SH.ov = () => label3d('ESPERTINHO', CAR2.position.x, 3.2, CAR2.position.z, prog(t, 47.23, 47.5), '#fff', '#d8423a', 38); });
+// M so you raise a concrete wall in the middle — the New Jersey barrier
+shot(49.79, (t, lt) => { traffic(t, { inner: 3, outer: 2, split: true, dens: .2, speed: 12 }); SHAKE = t > 50.3 && t < 51.3 ? .12 : 0; const kk = eio(cl(lt / 4.2)); cam(L3([3.4, 2.4, -4], [2.6, 3.4, -22], kk), [0, .6, -70], 40, lt); SH.ov = () => { if (t > 50.3 && t < 51.6) { dust(W / 2 - 40, 1180, prog(t, 50.3, 51.6), 20); } counter('MURETA', W / 2, 300, prog(t, 50.75, 51.0), 140, '#fff'); if (t > 52.9) counter('"NEW JERSEY"', W / 2, 430, prog(t, 52.99, 53.3), 110, '#f6d33c'); }; });
+// N holiday: half of Brazil goes down to the beach
+shot(54.03, (t, lt) => { traffic(t * .2, { inner: 3, outer: 2, split: false, dens: 1.0, speed: 3 }); SHAKE = 0; const k = eio(cl(lt / 3.7)); cam(L3([-20, 40, 30], [-12, 24, 10], k), [0, 0, -80], 48, lt); SH.ov = () => { counter('FERIADÃO', W / 2, 300, prog(t, 54.75, 55.05), 150, '#ff6a5a'); if (t > 56.3) pillTag('PRAIA ↓', W / 2, 440, prog(t, 56.83, 57.1), '#fff', '#3f7fb3'); }; });
+// O keep adding lanes until 12 side by side
+shot(57.71, (t, lt) => { const st = roadState(t); traffic(t, { inner: 3, outer: st.outer, split: true, dens: .4, speed: 8 }); SHAKE = t > 58.9 && t < 59.3 ? .35 : 0; const kk = eio(cl(lt / 3.4)); cam(L3([0, 70, 20], [0, 48, -4], kk), [0, 0, -40], 50, lt); SH.ov = () => { const n = t < 59.0 ? 10 : Math.min(12, 10 + Math.floor(prog(t, 59.0, 59.8) * 3)); counter(n + ' FAIXAS', W / 2, 330, prog(t, 57.8, 58.1), 160, '#fff'); }; });
+// P a road like that exists: New Jersey, USA
+shot(61.15, (t, lt) => { traffic(t, { inner: 3, outer: 3, split: true, dens: .35, speed: 12 }); SWAMP.position.y = -.05; SHAKE = 0; const k = eio(cl(lt / 4.9)); cam(L3([60, 50, -150], [40, 30, -200], k), [0, 0, -280], 46, lt); SH.ov = () => { counter('NEW JERSEY', W / 2, 300, prog(t, 62.91, 63.2), 140, '#f6d33c'); sub('ESTADOS UNIDOS', W / 2, 430, prog(t, 63.87, 64.1), '#fff'); }; });
+// Q add a pastel & sugarcane stand, a water seller in traffic, and that stuck truck
+shot(66.03, (t, lt) => { const part = t < 68.0 ? 0 : t < 69.6 ? 1 : 2; traffic(part === 1 ? 0 : t, { inner: 3, outer: 3, split: true, dens: part === 1 ? .9 : .3, speed: part === 1 ? 0 : 10, zmin: -600, zmax: part === 1 ? -60 + (t - 68) * 1.2 - 3 : 600 });
+  if (part === 0) { COOK.visible = true; pose(COOK, { pos: [37.5, 0, -120], ry: Math.PI / 2, e: 'smile', aR: -1.2 }); SHAKE = 0; cam([28, 4.2, -112], [36, 1.8, -120], 40, lt); }
+  else if (part === 1) { VEND.visible = true; const vx = 1.5 + 10.5 + 4 + 3.5 * 1.5 + .0; pose(VEND, { pos: [1.5 + 10.5 + 4 + 3.5 * 1.0 + 1.75 - .1 + 0 * vx, 0, -60 + (t - 68) * 1.2], ry: 0, walk: t * 6, e: talk(t) }); VEND.position.x = 1.5 + 10.5 + 4 + 3.5; SHAKE = 0; cam([VEND.position.x + 2.5, 3.4, VEND.position.z + 9], [VEND.position.x, 1.8, VEND.position.z], 42, lt - 1.97); }
+  else { MUDTRUCK.visible = true; MUDTRUCK.position.set(-30, -2.6, -312); MUDTRUCK.rotation.set(0, .5, .18); SHAKE = 0; cam([-46, 7, -296], [-30, 0, -312], 40, lt - 3.57); }
+  SH.ov = () => { if (part === 0) counter('PASTEL + CALDO DE CANA', W / 2, 300, prog(t, 66.75, 67.0), 80, '#f6d33c'); else if (part === 1) counter('ÁGUA! ÁGUA!', W / 2, 300, prog(t, 68.67, 68.9), 110, '#4fd1e8'); else counter('ATOLADO ATÉ HOJE', W / 2, 300, prog(t, 70.99, 71.3), 100, '#ff6a5a'); }; });
+// R congratulations! you built a highway inside a highway
+shot(72.27, (t, lt) => { traffic(t, { inner: 3, outer: 3, split: true, dens: .35, speed: 12 }); SHAKE = 0; const k = eio(cl(lt / 3.3)); cam(L3([0, 30, 30], [0, 70, 30], k), [0, 0, -60], 50, lt);
+  SH.ov = () => { counter('PARABÉNS!', W / 2, 300, prog(t, 72.27, 72.6), 160, '#f6d33c'); sub('UMA RODOVIA DENTRO DE UMA RODOVIA', W / 2, 440, prog(t, 73.87, 74.2), '#fff'); for (let i = 0; i < 60; i++) { const x = (i * 97 + (t - 72.27) * (40 + i % 7 * 10)) % W, y = ((t - 72.27) * (300 + (i % 5) * 60) + i * 37) % H; o2.fillStyle = ['#f2c12e', '#d8423a', '#3f7fb3', '#2e9e5b', '#e86aa0'][i % 5]; o2.save(); o2.translate(x, y); o2.rotate(t * 5 + i); o2.fillRect(-8, -4, 16, 8); o2.restore(); } }; });
+
+// ---------- captions ----------
+let WORDS = [];
+const KEY = new Set(['são', 'paulo', 'rio', 'estradinha', 'dupla,', 'caminhão.', 'rodovia', 'largona,', 'pedágio.', 'cidade,', 'brejão', 'mole', 'engole', 'caminhão', 'areia', 'firmar.', 'ponte.', 'maiores', 'cidades', 'estacionamento.', 'três', 'faixas', 'briga.', 'devagarinho,', 'costurando', 'batidinha', 'tudo.', 'separa', 'inteirinha,', 'fora.', 'expressa,', 'carro.', 'local,', 'sossego.', 'expressa', 'local.', 'marginal.', 'espertinho', 'canteiro', 'mureta', 'concreto', 'new', 'jersey.', 'jersey,', 'feriadão', 'praia', '12,', 'existe.', 'estados', 'unidos,', 'pastel', 'caldo', 'cana,', 'água', 'trânsito', 'brejo,', 'atolado', 'parabéns!', 'dentro']);
+let CH = [];
+function buildChunks() { let cur = []; const flush = () => { if (cur.length) CH.push(cur); cur = []; };
+  WORDS.forEach(w => { const txt = cur.map(x => x.w).join(' '); if (cur.length && (cur.length >= 3 || (txt + ' ' + w.w).length > 18 || w.s - cur[cur.length - 1].s > .9)) flush(); cur.push(w); if (/[.,!?:]$/.test(w.w)) flush(); }); flush();
+  CH.forEach((c, i) => { c.s = c[0].s; const nx = CH[i + 1]; c.e = Math.min(nx ? nx[0].s : 75.55, c[c.length - 1].s + 1.2); }); }
+function captions(t) {
+  if (t >= 75.55) return; const c = CH.find(c => t >= c.s - .02 && t < c.e); if (!c) return;
+  const k = c.s < .1 ? 1 : eback(prog(t, c.s - .02, c.s + .14)); const size = 80;
+  o2.font = `900 ${size}px Poppins`; const parts = c.map(w => ({ w: w.w.toUpperCase().replace(/[.,]$/, ''), key: KEY.has(w.w.toLowerCase()) }));
+  const sp = size * .28; const ws = parts.map(p => o2.measureText(p.w).width); const tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); const sc = Math.min(1, 960 / tot);
+  o2.save(); o2.translate(W / 2, 1400); o2.scale(k * sc, k * sc); let x = -tot / 2;
+  parts.forEach((p, i) => { const cx = x + ws[i] / 2; o2.save(); o2.shadowColor = 'rgba(0,0,0,.55)'; o2.shadowBlur = 18; o2.shadowOffsetY = 8; T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900, stroke: 16, sc: '#1b120c' }); o2.restore(); T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900 }); x += ws[i] + sp; });
+  o2.restore();
+}
+// ---------- end card ----------
+function endCard(t) {
+  const lt = t - 75.55; o2.fillStyle = '#1a120b'; o2.fillRect(0, 0, W, H);
+  o2.save(); o2.translate(W / 2, 520); const k = eback(cl(lt / .5)); o2.scale(k, k);
+  for (const [dx, a] of [[-70, 1], [70, .55]]) { o2.globalAlpha = a; o2.fillStyle = '#2E6E8E'; o2.beginPath(); o2.arc(dx, 0, 120, 0, 7); o2.fill(); o2.strokeStyle = '#F2C14E'; o2.lineWidth = 10; o2.stroke(); o2.lineWidth = 5; o2.beginPath(); o2.ellipse(dx, 0, 50, 120, 0, 0, 7); o2.moveTo(dx - 120, 0); o2.lineTo(dx + 120, 0); o2.stroke(); }
+  o2.restore(); o2.globalAlpha = 1;
+  T('MUNDO PARALELO', W / 2, 760, 104 * eback(cl((lt - .15) / .4)), '#fff', { w: 900 });
+  o2.fillStyle = '#F2C14E'; const lw = 520 * eo(cl((lt - .35) / .4)); o2.fillRect(W / 2 - lw / 2, 832, lw, 8);
+  T('VOCÊ ENCARARIA ESSA ESTRADA?', W / 2, 910, 44, '#F2C14E', { w: 800 });
+  const pk = (1 + .08 * Math.sin(t * 8)) * eback(cl((lt - .8) / .35)); o2.save(); o2.translate(W / 2, 1500); o2.scale(pk, pk); o2.fillStyle = '#C0392B'; rr(o2, -340, -70, 680, 140, 70); o2.fill(); o2.fillStyle = '#fff'; o2.beginPath(); o2.moveTo(-270, -32); o2.lineTo(-270, 32); o2.lineTo(-215, 0); o2.closePath(); o2.fill(); T('SIGA O CANAL', 35, 4, 54, '#fff', { w: 900 }); o2.restore();
+  o2.fillStyle = `rgba(0,0,0,${cl((t - 78.4) / .5)})`; o2.fillRect(0, 0, W, H);
+}
+// ---------- grain ----------
+const grainC = document.createElement('canvas'); grainC.width = 540; grainC.height = 960; const gx = grainC.getContext('2d'); const gid = gx.createImageData(540, 960);
+function grain(seed) { let s = (seed * 9301 + 49297) % 233280; for (let i = 0; i < gid.data.length; i += 4) { s = (s * 9301 + 49297) % 233280; const v = s / 233280 * 255; gid.data[i] = gid.data[i + 1] = gid.data[i + 2] = v; gid.data[i + 3] = 20; } gx.putImageData(gid, 0, 0); }
+
+
+
+sun.castShadow = false;
+window.renderFrame = (t) => {
+  if (t >= 75.55) { endCard(t); return out.toDataURL('image/jpeg', .9); }
+  hideAll(); SH.ov = null; SHAKE = 0; for (let i = 0; i < 6; i++) tbar(i, 0); SAND.position.y = t > 18 ? .05 : -.6; BRIDGE.position.y = t > 20 ? 0 : -4; MUDTRUCK.rotation.set(0, 0, 0);
+  hemi.intensity = 1.35; hemi.color.set(0xfff1d6); hemi.groundColor.set(0x6d7a3a); sun.intensity = 1.6; sun.position.set(40, 80, 40); scene.background = new THREE.Color(0x9fd0ea); scene.fog = new THREE.Fog(0xbfe0ef, 140, 520);
+  applyRoad(roadState(t)); TOLL.position.y = 0; CLOUDS.children.forEach((c, i) => { c.position.x = ((-160 + (i * 53) % 320 + t * 3 * c.userData.sp) + 160) % 320 - 160; });
+  const s = SH.filter(s => t >= s.t0).pop(); const lt = t - s.t0; s.fn(t, lt);
+  renderer.render(scene, camera);
+  o2.globalAlpha = 1; o2.filter = (lt < .14 && s.t0 > 0 ? `blur(${(1 - lt / .14) * 10}px) ` : '') + 'saturate(1.15) contrast(1.05) brightness(1.03)'; o2.drawImage(renderer.domElement, 0, 0); o2.filter = 'none'; if (camera.position.y > 6) { sunGlow(); birds(t); }
+  if (SH.ov) { o2.save(); SH.ov(); o2.restore(); }
+  const v = o2.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .8); v.addColorStop(0, 'rgba(10,5,0,0)'); v.addColorStop(1, 'rgba(10,5,0,.3)'); o2.fillStyle = v; o2.fillRect(0, 0, W, H);
+  grain(Math.floor(t * 30)); o2.drawImage(grainC, 0, 0, W, H);
+  if (lt < .1 && s.t0 > 0) { o2.fillStyle = `rgba(255,255,255,${.22 * (1 - lt / .1)})`; o2.fillRect(0, 0, W, H); }
+  captions(t);
+  return out.toDataURL('image/jpeg', .9);
+};
+window.setWords = (w) => { WORDS = w; CH = []; buildChunks(); };
+await document.fonts.load('900 80px Poppins'); await document.fonts.load('800 40px Poppins'); await document.fonts.load('700 40px Poppins'); await document.fonts.load('600 40px Poppins');
+window.ready = true;
+</script></body></html>
