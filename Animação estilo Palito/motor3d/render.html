@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Render Palito</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body>
+<script type="module">
+import * as P from './palito.js';
+const q = new URLSearchParams(location.search);
+const proj = await import(q.get('proj'));
+const W = +(q.get('w') || 1080), H = +(q.get('h') || 1920);
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+const R = new P.Render(canvas, W, H, +(q.get('ss') || 1));
+const shots = proj.CENAS;
+let cur = null, curIdx = -1;
+
+function limparFx() {
+  const f = R.fx; f.tint.setRGB(1, 1, 1); f.tintAmt = 0; f.glitch = 0; f.escuro = 0; f.vinheta = 0.35; f.flash = 0;
+}
+function liberar(obj) {
+  obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+}
+window.DURACAO = proj.DURACAO;
+window.FPS = proj.FPS || 24;
+window.renderAt = (t, formato = 'image/jpeg') => {
+  let i = shots.findIndex((s) => t >= s.ini && t < s.fim);
+  if (i < 0) i = t < shots[0].ini ? 0 : shots.length - 1;
+  if (i !== curIdx) {
+    if (cur) liberar(cur.scene);
+    cur = shots[i].build({ R, P, THREE: P.THREE });
+    curIdx = i;
+  }
+  limparFx();
+  const s = shots[i], lt = t - s.ini;
+  cur.update(lt, P.clamp(lt / (s.fim - s.ini)), t);
+  R.draw(cur.scene, cur.cam, t);
+  return canvas.toDataURL(formato, 0.93);
+};
+window.pronto = true;
+</script>
+</body></html>

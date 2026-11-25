@@ -21,10 +21,16 @@ Quando o usuário pedir um vídeo (mandando um MP3, um vídeo para reaproveitar 
 6. **Montagem**: `roteiro.json` (modelo em `ferramenta/roteiro_exemplo.json`) e depois `python3 "Animação estilo Palito/ferramenta/montar_video.py" roteiro.json saida.mp4`. A legenda é **Cal Sans**, já configurada; não troque.
 7. Confira a montagem extraindo uma grade de quadros com ffmpeg e comparando com `referencias/00-decupagem-quadro-a-quadro.jpg`. Envie o MP4 ao usuário com SendUserFile.
 
+## Modo 3D por código (preferido pelo usuário, sem créditos)
+O usuário escolheu a animação **3D estilo palito por código**: `Animação estilo Palito/motor3d/` (veja o `LEIAME.md` dele).
+- O exemplo completo é `projetos/01-nordeste-novela/`. Copie a estrutura: `narracao.mp3`, `palavras.json`, `decupagem.md`, `cenas.js` e `roteiro.json`.
+- Siga a direção que o usuário mandar (câmeras dinâmicas, transições, cenas sempre em movimento). A legenda continua em Cal Sans, via `montar_video.py`.
+- Antes do vídeo inteiro, renderize quadros de teste e confira cada cena. Corrija câmera atravessando objetos e cenas vazias.
+- Envie o MP4 final com SendUserFile. Os `.mp4` não vão para o git.
+
 ## Créditos
 As etapas 4 e 5 (e gerar a voz) usam conectores pagos (ElevenLabs creative_generate_image / creative_generate_video, ou Picsart). Antes de gerar, diga quantas imagens e clipes serão feitos e confirme **uma vez** com o usuário. Depois disso, siga sem novas perguntas.
 
 ## Não fazer
-- Não usar Three.js nem animação por código para o visual: o estilo depende de ilustração.
-- Não adicionar música, efeitos, transições ou textos além da legenda.
+- Não adicionar música nem textos na tela além da legenda, salvo pedido do usuário.
 - Não reutilizar quadros do vídeo de referência no vídeo final. Eles servem só de referência de estilo.

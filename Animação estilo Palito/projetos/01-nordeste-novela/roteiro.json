@@ -1,0 +1,7 @@
+{
+  "audio": "narracao.mp3",
+  "palavras": "palavras.json",
+  "cenas": [
+    {"visual": "video_mudo.mp4"}
+  ]
+}
