@@ -73,6 +73,18 @@ function claudioHead(o = {}) {
     if (m === 'grimace') s += `<path d="M-30 ${my + 4} Q0 ${my + 9} 30 ${my + 4}" stroke="${OL}" stroke-width="4" fill="none"/>`;
   }
   if (m === 'open') s += `<path d="M-24 ${my - 6} Q0 ${my - 10} 24 ${my - 6} Q22 ${my + 30} 0 ${my + 32} Q-22 ${my + 30} -24 ${my - 6}Z" ${st('#5a1f1f', 5)}/><rect x="-12" y="${my - 8}" width="10" height="9" fill="#fff"/><rect x="2" y="${my - 8}" width="10" height="9" fill="#fff"/><path d="M-12 ${my + 24} Q0 ${my + 12} 12 ${my + 24}" fill="#e2777a"/>`;
+  if (m === 'fullgrin') {
+    s += `<path d="M-34 ${my - 8} Q0 ${my - 12} 34 ${my - 8} Q30 ${my + 26} 0 ${my + 28} Q-30 ${my + 26} -34 ${my - 8}Z" ${st('#5a1f1f', 5)}/>`;
+    s += `<path d="M-30 ${my - 7} Q0 ${my - 11} 30 ${my - 7} L28 ${my + 6} Q0 ${my + 9} -28 ${my + 6}Z" fill="#fff"/>`;
+    s += `<path d="M-15 ${my - 9} V${my + 7} M0 ${my - 10} V${my + 8} M15 ${my - 9} V${my + 7}" stroke="#d8d2c8" stroke-width="3"/>`;
+    s += `<path d="M-14 ${my + 20} Q0 ${my + 12} 14 ${my + 20}" fill="#e2777a"/>`;
+  }
+  if (m === 'fangs') {
+    s += `<path d="M-30 ${my - 6} Q0 ${my - 10} 30 ${my - 6} Q26 ${my + 22} 0 ${my + 24} Q-26 ${my + 22} -30 ${my - 6}Z" ${st('#fff', 5)}/>`;
+    s += `<path d="M-22 ${my - 7} L-16 ${my + 20} L-10 ${my - 7}Z M10 ${my - 7} L16 ${my + 20} L22 ${my - 7}Z" ${st('#fff', 4)}/>`;
+    s += `<rect x="-6" y="${my - 8}" width="10" height="14" fill="#3a1c18"/>`;
+  }
+  if (m === 'numb') s += `<path d="M-26 ${my - 2} Q-6 ${my - 6} 22 ${my + 6} Q14 ${my + 26} -4 ${my + 22} Q-22 ${my + 18} -26 ${my - 2}Z" ${st('#5a1f1f', 5)}/><path d="M14 ${my + 20} q4 18 0 30" stroke="#8fd0ff" stroke-width="7" fill="none" stroke-linecap="round"/>`;
   if (m === 'o') s += `<ellipse cx="0" cy="${my + 6}" rx="12" ry="16" ${st('#5a1f1f', 5)}/>`;
   if (m === 'duck') s += `<ellipse cx="0" cy="${my + 2}" rx="14" ry="10" ${st('#d9707a', 5)}/>`;
   if (m === 'flat') s += `<path d="M-18 ${my} L18 ${my}" stroke="${OL}" stroke-width="6"/>`;
