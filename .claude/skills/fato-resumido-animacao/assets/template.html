@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fato Resumido</title><style>
+@font-face{font-family:CalSans;src:url(CalSans.ttf) format('truetype')}
+html,body{margin:0;background:#000;overflow:hidden}
+#wrap{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage{position:absolute;left:0;top:0}
+#capbox .cap{position:absolute;left:50%;top:1135px;width:980px;text-align:center;font-family:CalSans;font-size:84px;line-height:1.08;letter-spacing:1px;color:#fbf6ec;
+ -webkit-text-stroke:3px #2a1a0e;paint-order:stroke fill;text-shadow:0 6px 0 rgba(42,26,14,.55),0 10px 26px rgba(0,0,0,.45)}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+</style></head><body><div id="wrap"><svg id="stage" width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg"></svg><div id="capbox"></div><div id="fade"></div></div>
+<script src="engine.js"></script>
+<script src="SCENES_FILE"></script>
+<script>Engine.boot()</script></body></html>
