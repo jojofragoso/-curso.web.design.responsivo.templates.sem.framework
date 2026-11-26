@@ -1,0 +1,386 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Poppins;font-weight:600;src:url(node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:700;src:url(node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:800;src:url(node_modules/@fontsource/poppins/files/poppins-latin-800-normal.woff2)}
+@font-face{font-family:Poppins;font-weight:900;src:url(node_modules/@fontsource/poppins/files/poppins-latin-900-normal.woff2)}
+html,body{margin:0;background:#000}canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<canvas id="out" width="1080" height="1920"></canvas>
+<script type="module">
+import * as THREE from 'three';
+const W = 1080, H = 1920;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const out = document.getElementById('out'), o2 = out.getContext('2d');
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, a, b) => cl((t - a) / (b - a));
+const eio = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const eo = (t) => 1 - Math.pow(1 - t, 3);
+const eback = (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+// ---------- toon materials + ink outline ----------
+const grad = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 1; const x = c.getContext('2d'); ['#6a6a6a', '#a8a8a8', '#e0e0e0', '#ffffff'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i, 0, 1, 1); }); const t = new THREE.CanvasTexture(c); t.minFilter = t.magFilter = THREE.NearestFilter; return t; })();
+const mat = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...o });
+const INK = new THREE.MeshBasicMaterial({ color: 0x1b120c, side: THREE.BackSide });
+function ink(mesh, s = 1.04) { const m = new THREE.Mesh(mesh.geometry, INK); m.scale.setScalar(s); m.raycast = () => {}; mesh.add(m); return mesh; }
+function M(geo, c, o = {}) { const { ink: ik, inkS, ...mo } = o; const m = new THREE.Mesh(geo, c instanceof THREE.Material ? c : mat(c, mo)); m.castShadow = true; m.receiveShadow = true; if (ik !== false) ink(m, inkS || 1.04); return m; }
+const box = (w, h, d, c, o) => M(new THREE.BoxGeometry(w, h, d), c, o);
+const cyl = (r1, r2, h, c, o, seg = 20) => M(new THREE.CylinderGeometry(r1, r2, h, seg), c, o);
+const sph = (r, c, o) => M(new THREE.SphereGeometry(r, 24, 18), c, o);
+function texCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+
+const scene = new THREE.Scene();
+const hemi = new THREE.HemisphereLight(0xfff1d6, 0x6d5a3a, 1.3); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe7c0, 1.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); scene.add(sun, sun.target);
+const lampLight = new THREE.PointLight(0xffc477, 0, 14, 1.6); scene.add(lampLight);
+const phoneLight = new THREE.PointLight(0x7fb6ff, 0, 6, 1.5); scene.add(phoneLight);
+const candleLight = new THREE.PointLight(0xffa548, 0, 10, 1.6); scene.add(candleLight);
+const sirenLight = new THREE.PointLight(0xff3030, 0, 16, 1.2); scene.add(sirenLight);
+
+// ---------- faces ----------
+function drawFace(x, e, o) {
+  const S = 512; x.fillStyle = e === 'dead' ? '#cdd3d6' : o.skin; x.fillRect(0, 0, S, S);
+  const cx = 256, ey = 236, dx = 52, lk = o.look || 0;
+  if (e !== 'dead') { x.fillStyle = 'rgba(232,120,110,.28)'; x.beginPath(); x.arc(cx - 86, 300, 26, 0, 7); x.arc(cx + 86, 300, 26, 0, 7); x.fill(); }
+  x.strokeStyle = '#1b120c'; x.lineCap = 'round'; x.lineJoin = 'round';
+  const closed = e === 'sleep' || e === 'dead' || e === 'blink';
+  for (const s of [-1, 1]) {
+    const ex = cx + s * dx;
+    if (closed) { x.lineWidth = 9; x.beginPath(); x.arc(ex, ey - 6, 22, .25 * Math.PI, .75 * Math.PI); x.stroke(); if (o.lashes) { x.beginPath(); x.moveTo(ex + s * 22, ey + 8); x.lineTo(ex + s * 32, ey + 2); x.stroke(); } continue; }
+    const r = e === 'shock' ? 34 : 30;
+    x.fillStyle = '#fff'; x.beginPath(); x.ellipse(ex, ey, r * .82, r, 0, 0, 7); x.fill(); x.lineWidth = 7; x.stroke();
+    const pr = e === 'shock' ? 9 : 15; x.fillStyle = o.iris || '#6b3e1e'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr + 5, 0, 7); x.fill(); x.fillStyle = '#120a06'; x.beginPath(); x.arc(ex + lk * 9, ey + 4, pr - 2, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(ex + lk * 9 - 5, ey - 3, 4, 0, 7); x.fill();
+    if (e === 'suspect' || e === 'tired') { x.fillStyle = o.skin; x.fillRect(ex - r, ey - r - 2, r * 2, r * (e === 'tired' ? .95 : .8)); x.lineWidth = 7; x.beginPath(); x.moveTo(ex - r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.lineTo(ex + r * .8, ey - r * .2 + (e === 'tired' ? 4 : 0)); x.stroke(); }
+    if (o.lashes) { x.lineWidth = 6; x.beginPath(); x.moveTo(ex + s * r * .7, ey - r * .7); x.lineTo(ex + s * (r * .7 + 12), ey - r * .7 - 10); x.stroke(); }
+    if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.arc(ex, ey, r + 12, 0, 7); x.stroke(); x.strokeStyle = '#1b120c'; }
+  }
+  if (o.glasses) { x.lineWidth = 7; x.strokeStyle = '#5a3a1e'; x.beginPath(); x.moveTo(cx - 10, ey - 6); x.lineTo(cx + 10, ey - 6); x.stroke(); x.strokeStyle = '#1b120c'; }
+  // brows
+  x.lineWidth = 9; x.strokeStyle = o.brow || '#2a1a10';
+  const by = ey - (e === 'shock' ? 58 : 48);
+  for (const s of [-1, 1]) { const ex = cx + s * dx; let inner = 0, outer = 0;
+    if (e === 'sad' || e === 'worried' || e === 'cry' || e === 'plead') { inner = -12; outer = 6; }
+    if (e === 'angry') { inner = 10; outer = -6; }
+    if (e === 'suspect' && s > 0) { inner = -14; outer = -14; }
+    x.beginPath(); x.moveTo(ex - s * 4 - s * -24 * 0 + (s < 0 ? 20 : -20), by + inner); x.lineTo(ex + (s < 0 ? -22 : 22), by + outer); x.stroke(); }
+  // nose
+  x.lineWidth = 6; x.strokeStyle = 'rgba(90,40,20,.6)'; x.beginPath(); x.moveTo(cx - 4, 268); x.quadraticCurveTo(cx + 10, 290, cx - 6, 296); x.stroke();
+  if (o.mustache) { x.fillStyle = o.brow || '#2a1a10'; x.beginPath(); x.moveTo(cx - 52, 330); x.quadraticCurveTo(cx, 296, cx + 52, 330); x.quadraticCurveTo(cx, 318, cx - 52, 330); x.fill(); }
+  // mouth
+  x.strokeStyle = '#3a1a10'; x.lineWidth = 8; x.fillStyle = '#5a2418';
+  const my = 330;
+  if (e === 'smile' || e === 'happy') { x.beginPath(); x.moveTo(cx - 34, my - 6); x.quadraticCurveTo(cx, my + 26, cx + 34, my - 6); x.stroke(); }
+  else if (e === 'talk' || e === 'shock') { x.beginPath(); x.ellipse(cx, my + 4, e === 'shock' ? 16 : 18, e === 'shock' ? 22 : 12, 0, 0, 7); x.fill(); }
+  else if (e === 'sad' || e === 'cry') { x.beginPath(); x.moveTo(cx - 26, my + 10); x.quadraticCurveTo(cx, my - 8, cx + 26, my + 10); x.stroke(); }
+  else if (e === 'worried' || e === 'plead') { x.beginPath(); x.moveTo(cx - 28, my + 4); x.quadraticCurveTo(cx - 14, my - 6, cx, my + 4); x.quadraticCurveTo(cx + 14, my + 12, cx + 28, my + 2); x.stroke(); }
+  else if (e === 'sleep') { x.beginPath(); x.arc(cx, my, 8, 0, Math.PI); x.stroke(); }
+  else if (e === 'dead') { x.beginPath(); x.moveTo(cx - 18, my + 4); x.lineTo(cx + 18, my + 4); x.stroke(); }
+  else { x.beginPath(); x.moveTo(cx - 22, my + 2); x.lineTo(cx + 22, my + 2); x.stroke(); }
+  if (e === 'cry' || e === 'plead') { x.fillStyle = 'rgba(120,190,240,.85)'; for (const s of [-1, 1]) { x.beginPath(); x.ellipse(cx + s * dx + s * 6, ey + 58, 9, 22, 0, 0, 7); x.fill(); } }
+  if (e === 'sweat') {}
+}
+
+// ---------- characters ----------
+const CHARS = {};
+function makeChar(name, o) {
+  const G = new THREE.Group(); G.userData = { o, faces: {} };
+  const skinM = mat(o.skin);
+  // legs
+  const legs = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .2, .95, 0); const l = cyl(.15, .13, .9, o.pants, {}, 12); l.position.y = -.45; p.add(l); const sh = box(.3, .16, .42, 0x2a2420); sh.position.set(0, -.92, .06); p.add(sh); G.add(p); legs.push(p); }
+  // torso
+  const torsoGeo = new THREE.CapsuleGeometry(.46, .55, 8, 16); const torso = M(torsoGeo, o.shirt); torso.position.y = 1.42; torso.scale.set(1, 1, .82); G.add(torso);
+  if (o.collar) { const c = box(.5, .12, .1, o.collar, { ink: false }); c.position.set(0, 1.86, .36); G.add(c); }
+  // arms
+  const arms = []; for (const s of [-1, 1]) { const p = new THREE.Group(); p.position.set(s * .54, 1.78, 0); const a = M(new THREE.CapsuleGeometry(.12, .52, 6, 10), o.shirt); a.position.y = -.38; p.add(a); const h = sph(.14, o.skin); h.position.y = -.76; p.add(h); p.rotation.z = s * .12; G.add(p); arms.push(p); }
+  // head
+  const hp = new THREE.Group(); hp.position.y = 2.42; G.add(hp);
+  const hg = new THREE.SphereGeometry(.56, 40, 30); hg.scale(1, 1.16, 1);
+  const head = new THREE.Mesh(hg, new THREE.MeshToonMaterial({ gradientMap: grad })); head.rotation.y = -Math.PI / 2; head.castShadow = true; ink(head, 1.035); hp.add(head);
+  for (const s of [-1, 1]) { const e = sph(.11, o.skin); e.scale.set(.6, 1, 1); e.position.set(s * .56, 0, 0); hp.add(e); }
+  // hair
+  const hc = o.hairCol;
+  if (o.hair === 'short' || o.hair === 'long' || o.hair === 'bun') { const capG = new THREE.SphereGeometry(.605, 32, 20, 0, Math.PI * 2, 0, Math.PI * .34); capG.scale(1, 1.16, 1); const cap = M(capG, hc); cap.rotation.x = -.22; hp.add(cap);
+    const bkG = new THREE.SphereGeometry(.6, 28, 18, Math.PI, Math.PI, 0, Math.PI * .66); bkG.scale(1.02, 1.17, 1.03); const back = M(bkG, hc, { ink: false }); hp.add(back); }
+  if (o.hair === 'long') { const lb = box(1.1, 1.05, .3, hc); lb.position.set(0, -.5, -.42); hp.add(lb); for (const sx of [-1, 1]) { const sd = box(.16, .95, .34, hc, { ink: false }); sd.position.set(sx * .6, -.38, -.22); hp.add(sd); }
+    }
+  if (o.hair === 'bun') { const b = sph(.26, hc); b.position.set(0, .62, -.3); hp.add(b); }
+  if (o.hair === 'bald') { for (const s of [-1, 1]) { const t = sph(.2, hc, { ink: false }); t.scale.set(.6, 1, 1.3); t.position.set(s * .5, .08, -.1); hp.add(t); } }
+  G.userData.parts = { legs, arms, hp, head, torso };
+  scene.add(G); CHARS[name] = G; return G;
+}
+function face(ch, e, look = 0) { const key = e + '|' + look; const f = ch.userData.faces; if (!f[key]) f[key] = texCanvas(512, 512, (x) => drawFace(x, e, { ...ch.userData.o, look })); const h = ch.userData.parts.head; if (h.material.map !== f[key]) { h.material.map = f[key]; h.material.needsUpdate = true; } }
+function pose(ch, p = {}) {
+  const { legs, arms, hp, torso } = ch.userData.parts; ch.visible = p.visible !== false;
+  ch.position.set(...(p.pos || [0, 0, 0])); ch.rotation.set(p.rx || 0, p.ry || 0, p.rz || 0); ch.scale.setScalar(p.s || 1);
+  const w = p.walk; const sw = w != null ? Math.sin(w) * .55 : 0;
+  legs[0].rotation.x = sw; legs[1].rotation.x = -sw;
+  if (p.sit) { legs[0].rotation.x = legs[1].rotation.x = -1.45; }
+  arms[0].rotation.set(p.aL != null ? p.aL : -sw * .7, 0, -.12 - (p.aLz || 0)); arms[1].rotation.set(p.aR != null ? p.aR : sw * .7, 0, .12 + (p.aRz || 0));
+  hp.rotation.set(p.hx || 0, p.hy || 0, p.hz || 0); hp.position.y = 2.42 + (w != null ? Math.abs(Math.cos(w)) * .04 : 0) + (p.breath || 0);
+  face(ch, p.e || 'neutral', p.look || 0);
+}
+// ---------- overlays (2D on top of render) ----------
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + w, Y, X + w, Y + h, r); x.arcTo(X + w, Y + h, X, Y + h, r); x.arcTo(X, Y + h, X, Y, r); x.arcTo(X, Y, X + w, Y, r); x.closePath(); }
+function T(s, X, Y, size, col, o = {}) { o2.font = `${o.w || 800} ${size}px Poppins`; o2.textAlign = o.a || 'center'; o2.textBaseline = 'middle'; if (o.stroke) { o2.lineJoin = 'round'; o2.lineWidth = o.stroke; o2.strokeStyle = o.sc || '#1b120c'; o2.strokeText(s, X, Y); } o2.fillStyle = col; o2.fillText(s, X, Y); }
+function phoneUI(X, Y, s, o = {}) { // big phone lockscreen
+  o2.save(); o2.translate(X, Y); o2.rotate(o.rot || 0); o2.scale(s, s);
+  o2.shadowColor = 'rgba(0,0,0,.5)'; o2.shadowBlur = 50; o2.shadowOffsetY = 20; o2.fillStyle = '#16181c'; rr(o2, -260, -520, 520, 1040, 70); o2.fill(); o2.shadowColor = 'transparent';
+  const g = o2.createLinearGradient(0, -500, 0, 500); g.addColorStop(0, o.bg1 || '#2a2f6a'); g.addColorStop(1, o.bg2 || '#141633'); o2.fillStyle = g; rr(o2, -238, -496, 476, 992, 54); o2.fill();
+  o2.fillStyle = '#000'; rr(o2, -70, -480, 140, 34, 17); o2.fill();
+  if (o.time) { T(o.time, 0, -330, 130, '#fff', { w: 600 }); T(o.date || '', 0, -235, 34, 'rgba(255,255,255,.8)', { w: 600 }); }
+  if (o.notif) { const k = eback(cl(o.notif)); o2.save(); o2.translate((o.swipe || 0) * 400, -60); o2.scale(k, k); o2.fillStyle = 'rgba(255,255,255,.92)'; rr(o2, -210, -70, 420, 140, 28); o2.fill(); o2.fillStyle = '#1b120c'; rr(o2, -185, -45, 50, 50, 12); o2.fill(); T('!', -160, -20, 34, '#fff'); T('AVISO · agora', -120, -38, 24, '#555', { a: 'left', w: 600 }); T('Despeça-se.', -120, 12, 42, '#111', { a: 'left', w: 800 }); o2.restore(); }
+  if (o.empty) T('Sem notificações', 0, -40, 34, 'rgba(255,255,255,.7)', { w: 600 });
+  if (o.off) { o2.fillStyle = `rgba(0,0,0,${o.off})`; rr(o2, -238, -496, 476, 992, 54); o2.fill(); }
+  o2.restore();
+}
+function pillTag(s, X, Y, k, col = '#fff', bg = '#d8423a') { if (k <= 0) return; const kk = eback(cl(k)); o2.save(); o2.translate(X, Y); o2.scale(kk, kk); o2.rotate(-.04); o2.font = '900 64px Poppins'; const w = o2.measureText(s).width + 70; o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 20; o2.shadowOffsetY = 8; o2.fillStyle = bg; rr(o2, -w / 2, -52, w, 104, 22); o2.fill(); o2.shadowColor = 'transparent'; T(s, 0, 4, 64, col, { w: 900 }); o2.restore(); }
+function calendarUI(X, Y, s, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)) * s; o2.scale(kk, kk); o2.shadowColor = 'rgba(0,0,0,.35)'; o2.shadowBlur = 30; o2.shadowOffsetY = 14; o2.fillStyle = '#fffaf0'; rr(o2, -330, -330, 660, 660, 30); o2.fill(); o2.shadowColor = 'transparent'; o2.fillStyle = '#d8423a'; rr(o2, -330, -330, 660, 120, 30); o2.fill(); o2.fillRect(-330, -250, 660, 40); T('DIAS', 0, -270, 58, '#fff', { w: 900 });
+  for (let i = 0; i < 28; i++) { const cx = -250 + (i % 7) * 83, cy = -150 + Math.floor(i / 7) * 95; T('' + (i + 1), cx, cy, 34, '#3a2a20', { w: 700 }); if (i < 12 && k > .5) { o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.beginPath(); o2.moveTo(cx - 20, cy - 20); o2.lineTo(cx + 20, cy + 20); o2.moveTo(cx + 20, cy - 20); o2.lineTo(cx - 20, cy + 20); o2.stroke(); } if (i === 22) { o2.fillStyle = '#d8423a'; o2.beginPath(); o2.arc(cx, cy, 36, 0, 7); o2.strokeStyle = '#d8423a'; o2.lineWidth = 6; o2.stroke(); } }
+  o2.restore(); }
+function newspaperUI(X, Y, k) { if (k <= 0) return; o2.save(); o2.translate(X, Y); o2.rotate(lerp(3, -.05, eo(cl(k)))); const s = lerp(.1, 1, eo(cl(k))); o2.scale(s, s); o2.shadowColor = 'rgba(0,0,0,.4)'; o2.shadowBlur = 40; o2.shadowOffsetY = 18; o2.fillStyle = '#f5efe2'; o2.fillRect(-330, -420, 660, 840); o2.shadowColor = 'transparent'; T('O DIÁRIO', 0, -350, 54, '#1b120c', { w: 900 }); o2.fillStyle = '#1b120c'; o2.fillRect(-290, -310, 580, 5); T('AVISO', 0, -220, 110, '#1b120c', { w: 900 }); T('FALHOU?', 0, -110, 110, '#1b120c', { w: 900 }); o2.fillStyle = '#8a8a8a'; rr(o2, -280, -30, 250, 330, 10); o2.fill(); o2.fillStyle = '#2a2a2a'; rr(o2, -210, 40, 110, 190, 14); o2.fill(); o2.fillStyle = 'rgba(27,18,12,.35)'; for (let i = 0; i < 10; i++) o2.fillRect(10, -20 + i * 34, 270 - (i % 3) * 40, 14); o2.restore(); }
+function contactsUI(X, Y, k, t) { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.fillStyle = '#16181c'; rr(o2, -230, -400, 460, 800, 50); o2.fill(); o2.fillStyle = '#20243a'; rr(o2, -212, -380, 424, 760, 36); o2.fill(); T('CONTATOS', 0, -320, 36, '#fff', { w: 800 }); ['Mãe', 'Bia', 'Chefe', 'Tio Zé', 'Ana', 'Rafa', 'Vó Lia'].forEach((n, i) => { const y = -230 + i * 90; o2.fillStyle = 'rgba(255,255,255,.12)'; o2.beginPath(); o2.arc(-150, y, 28, 0, 7); o2.fill(); T(n, -100, y, 34, '#fff', { a: 'left', w: 600 }); const on = (t * 2.5) % 7 > i; o2.fillStyle = on ? '#3fbf6a' : 'rgba(255,255,255,.2)'; o2.beginPath(); o2.arc(150, y, 26, 0, 7); o2.fill(); }); o2.restore(); }
+function bigClock(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); o2.font = '900 150px Poppins'; const sz = Math.min(150, 150 * 960 / o2.measureText(s).width); T(s, X, Y, sz, col, { w: 900, stroke: 18, sc: '#1b120c' }); o2.restore(); }
+
+
+function counter(s, X, Y, k, size = 160, col = '#fff') { if (k <= 0) return; o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.font = `900 ${size}px Poppins`; const sz = Math.min(size, size * 980 / o2.measureText(s).width); T(s, 0, 0, sz, col, { w: 900, stroke: 20, sc: '#1b120c' }); o2.restore(); }
+// ===== the town of colors and the dam =====
+await document.fonts.load('900 60px Poppins');
+const camera = new THREE.PerspectiveCamera(42, W / H, .1, 700);
+const ALL = [];
+const L3 = (a, b, k) => [lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k)];
+const blinkE = (t, e = 'neutral', seed = 0) => (((t + seed) % 3.1) < .12 ? 'blink' : e);
+const talk = (t) => (Math.floor(t * 9) % 2 ? 'talk' : 'neutral');
+function hn(t, s) { return Math.sin(t * 13.1 + s) * .5 + Math.sin(t * 27.7 + s * 2) * .3 + Math.sin(t * 5.3 + s * 3) * .2; }
+let SHAKE = 0;
+function cam(p, l, fov = 42, lt = 1) { const dd = Math.hypot(p[0] - l[0], p[1] - l[1], p[2] - l[2]) * .02; const sx = hn(lt, 1) * SHAKE + Math.sin(lt * .8) * dd, sy = hn(lt, 5) * SHAKE + Math.sin(lt * .6 + 1) * dd * .5; camera.position.set(p[0] + sx, p[1] + sy, p[2]); camera.lookAt(l[0], l[1], l[2]); camera.fov = fov * (1 + .12 * (1 - eo(cl(lt / .35)))); camera.updateProjectionMatrix(); }
+const _v = new THREE.Vector3(); function scr(x, y, z) { _v.set(x, y, z).project(camera); return [(_v.x + 1) / 2 * W, (1 - _v.y) / 2 * H, _v.z]; }
+function sparkle(X, Y, k) { if (k <= 0 || k >= 1) return; o2.save(); o2.translate(X, Y); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; const r = 40 + k * 170; o2.globalAlpha = 1 - k; o2.fillStyle = ['#fff6a0', '#ffffff', '#ffd23f'][i % 3]; o2.save(); o2.translate(Math.cos(a) * r, Math.sin(a) * r); o2.rotate(a); o2.beginPath(); o2.moveTo(0, -16); o2.lineTo(5, 0); o2.lineTo(0, 16); o2.lineTo(-5, 0); o2.closePath(); o2.fill(); o2.restore(); } o2.restore(); }
+function label3d(s, x, y, z, k, col = '#fff', bg = '#1b120c', size = 40) { if (k <= 0) return; size *= 1.5; const [X, Y] = scr(x, y, z); sparkle(X, Y, k); o2.save(); o2.translate(X, Y); const kk = eback(cl(k)); o2.scale(kk, kk); o2.font = `900 ${size}px Poppins`; const w = o2.measureText(s).width + 50; o2.fillStyle = bg; rr(o2, -w / 2, -size * .85, w, size * 1.7, size * .85); o2.fill(); T(s, 0, 2, size, col, { w: 900 }); o2.restore(); }
+function speech(s, x, y, z, k) { if (k <= 0) return; const [X, Y] = scr(x, y, z); const lines = s.split('\n'); o2.save(); o2.translate(Math.max(260, Math.min(W - 260, X)), Math.max(220, Y - 40)); const kk = eback(cl(k)); o2.scale(kk, kk); o2.font = '800 52px Poppins'; const w = Math.max(...lines.map(l => o2.measureText(l).width)) + 70, h = lines.length * 66 + 44; o2.fillStyle = '#fff'; rr(o2, -w / 2, -h - 30, w, h, 26); o2.fill(); o2.beginPath(); o2.moveTo(-18, -32); o2.lineTo(0, 4); o2.lineTo(18, -32); o2.fill(); lines.forEach((l, i) => T(l, 0, -h - 30 + 54 + i * 66, 52, '#1b120c', { w: 800 })); o2.restore(); }
+function sub(s, X, Y, k, col = '#fff') { if (k <= 0) return; o2.save(); o2.globalAlpha = cl(k * 3); T(s, X, Y, 64, col, { w: 900, stroke: 14, sc: '#1b120c' }); o2.restore(); }
+const GLOWC = { yellow: 0xffe14a, pink: 0xff7ac8, grey: 0xd8dce4, blue: 0x3fe0ff };
+
+// ---------- characters ----------
+const mk = (n, o) => { const c = makeChar(n, o); ALL.push(c); c.userData.glow = null; return c; };
+const KID = mk('kid', { skin: '#E8B48C', hair: 'short', hairCol: 0x3a2416, shirt: 0xd8607a, pants: 0x3a4a6a, iris: '#4a2a14' });
+const DAD = mk('dad', { skin: '#E8B48C', hair: 'short', hairCol: 0x3a2416, shirt: 0x8a6a4a, pants: 0x5a4a3a, iris: '#4a2a14', mustache: true });
+const MOM = mk('mom', { skin: '#E8B48C', hair: 'long', hairCol: 0x5a3a22, shirt: 0x3f8a5a, pants: 0x3a3a4a, lashes: true });
+const NEWT = mk('newt', { skin: '#C98F67', hair: 'bald', hairCol: 0x3a2a20, shirt: 0xffffff, pants: 0x4a4a4a, mustache: true });
+const CELIA = mk('celia', { skin: '#F1C7A3', hair: 'bun', hairCol: 0xc8c4bc, shirt: 0xe86aa0, pants: 0x6a3a5a, lashes: true, glasses: true });
+const VOVO = mk('vovo', { skin: '#E3B08E', hair: 'bald', hairCol: 0xd8d8d4, shirt: 0x6a7a8a, pants: 0x4a4a52, mustache: true, brow: '#bdbdb8' });
+const PREF = mk('pref', { skin: '#F1C7A3', hair: 'short', hairCol: 0xb8b8b4, shirt: 0x2b3540, pants: 0x1e1e24, glasses: true });
+const TOWN = []; const TC = [[0x3f7fb3, '#E8B48C'], [0xd8423a, '#C98F67'], [0x2e9e5b, '#8E5A38'], [0xf2c12e, '#F1C7A3'], [0x8e5ba8, '#E8B48C'], [0xf07a2a, '#C98F67'], [0x16a085, '#F1C7A3'], [0xe86aa0, '#8E5A38'], [0x5d6d7e, '#E3B08E'], [0xb5651d, '#E8B48C']];
+TC.forEach(([sh, sk], i) => TOWN.push(mk('t' + i, { skin: sk, hair: i % 3 === 2 ? 'bald' : (i % 2 ? 'long' : 'short'), hairCol: [0x241812, 0x6b4423, 0x141010][i % 3], shirt: sh, pants: [0x2f3d5c, 0x3e3a30, 0x4a3a34][i % 3], lashes: i % 2 === 1 })));
+// straw hats for festa
+function strawHat(ch) { const hp = ch.userData.parts.hp; const br = cyl(.95, .95, .05, 0xe6c46a, { ink: false }); br.position.y = .55; hp.add(br); const tp = cyl(.45, .55, .4, 0xe6c46a, { ink: false }); tp.position.y = .78; hp.add(tp); br.userData.hat = tp.userData.hat = true; br.visible = tp.visible = false; ch.userData.hats = [br, tp]; }
+TOWN.forEach(strawHat); strawHat(KID); strawHat(MOM);
+function hats(ch, on) { (ch.userData.hats || []).forEach(h => h.visible = on); }
+// neon glow: recolor ink outlines + darken body
+const glowMats = {}; Object.entries(GLOWC).forEach(([k, c]) => glowMats[k] = new THREE.MeshBasicMaterial({ color: c, side: THREE.BackSide }));
+function glow(ch, key) { ch.traverse(m => { if (m.isMesh && (m.material === INK || m.userData.inkSwap)) { if (key) { m.material = glowMats[key]; m.userData.inkSwap = true; m.scale.setScalar(1.09); } else { m.material = INK; m.scale.setScalar(1.04); } } }); ch.userData.glow = key; }
+function resetGlow() { ALL.forEach(c => { if (c.userData && c.userData.glow) glow(c, null); }); }
+// ---------- props ----------
+const TORCH = new THREE.Group(); { const b = cyl(.1, .12, .5, 0x2a2a2a); b.rotation.x = Math.PI / 2; TORCH.add(b); const l = cyl(.14, .1, .1, 0xfff1c0, { ink: false }); l.rotation.x = Math.PI / 2; l.position.z = .28; TORCH.add(l); } scene.add(TORCH); ALL.push(TORCH);
+const beam = new THREE.SpotLight(0xfff2c0, 0, 30, .35, .5, 1); scene.add(beam, beam.target);
+const WRENCH = box(.1, .9, .2, 0x9a9aa2); scene.add(WRENCH); ALL.push(WRENCH);
+const CHAIR = new THREE.Group(); { const sb = box(1.9, .5, 1.2, 0x8a4a3a); sb.position.y = .45; CHAIR.add(sb); const bk = box(1.9, 1.8, .3, 0x8a4a3a); bk.position.set(0, 1.3, -.6); CHAIR.add(bk); for (const x of [-.85, .85]) { const a = box(.2, .4, 1.2, 0x7a3a2a); a.position.set(x, .9, 0); CHAIR.add(a); } } scene.add(CHAIR); ALL.push(CHAIR);
+const TOOLBOX = box(.9, .5, .4, 0xd8423a); scene.add(TOOLBOX); ALL.push(TOOLBOX);
+// ---------- TOWN set ----------
+const TWN = new THREE.Group(); scene.add(TWN);
+{ const G = TWN; const gr = box(400, .2, 400, 0x6fb244, { ink: false }); gr.position.set(0, -.1, -60); G.add(gr); const road = box(9, .05, 200, 0x55565c, { ink: false }); road.position.set(0, .02, -40); G.add(road); for (let i = 0; i < 24; i++) { const d = box(.25, .02, 2.5, 0xf2c12e, { ink: false }); d.position.set(0, .06, 40 - i * 8); G.add(d); } const side = box(3, .25, 200, 0xbfbab0, { ink: false }); side.position.set(6, .12, -40); G.add(side); const side2 = side.clone(); side2.position.x = -6; G.add(side2);
+  const cols = [0xe8a87c, 0x9ad0c2, 0xf2d48a, 0xc8a2d8, 0xf0b8b8, 0xa8c8e8]; for (let i = 0; i < 14; i++) { const sx = i % 2 ? 1 : -1, z = 20 - Math.floor(i / 2) * 14, h = 6 + (i % 3) * 3; const b = box(10, h, 10, cols[i % 6]); b.position.set(sx * 13, h / 2, z); G.add(b); for (let r = 0; r < Math.floor(h / 2.6); r++) for (const c of [-3, 0, 3]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({ color: 0x3a4a5a })); w.position.set(sx * 13 - sx * 5.01, 2.2 + r * 2.6, z + c); w.rotation.y = sx * -Math.PI / 2; w.userData.win = true; G.add(w); } }
+  // street lamps
+  G.userData.lamps = []; for (let i = 0; i < 8; i++) { const sx = i % 2 ? 1 : -1, z = 24 - i * 9; if ((sx < 0 && Math.abs(z - 6) < 7) || (sx > 0 && Math.abs(z + 8) < 7)) continue; const p = cyl(.1, .12, 5, 0x2a2a2a); p.position.set(sx * 5, 2.5, z); G.add(p); const bl = sph(.35, 0xfff1c0, { ink: false }); bl.position.set(sx * 5, 5.1, z); G.add(bl); G.userData.lamps.push(bl); }
+  // hills around the valley + dam on top
+  for (let i = 0; i < 12; i++) { const h = M(new THREE.SphereGeometry(40, 16, 10), 0x5fa23a, { ink: false }); h.scale.set(1, .5, 1); h.position.set((i % 2 ? 1 : -1) * 70, -6, -40 - i * 20); G.add(h); }
+  const back = M(new THREE.SphereGeometry(70, 20, 12), 0x5a9a38, { ink: false }); back.scale.set(2.2, .5, .5); back.position.set(0, -6, -265); G.add(back); }
+// bakery + apartment (special facades on the street)
+function signTex(txt, bg, fg, w = 512, h = 90, size = 52) { return texCanvas(w, h, (g) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = `900 ${size}px Poppins`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 3); }); }
+const BAK = new THREE.Group(); { const f = box(9, 5, .4, 0xf3e6c8); f.position.y = 2.5; BAK.add(f); const aw = box(9.4, .3, 1.6, 0xd8423a); aw.position.set(0, 4.1, .9); BAK.add(aw); const sg = new THREE.Mesh(new THREE.PlaneGeometry(6, 1), new THREE.MeshBasicMaterial({ map: signTex('PADARIA DO NEWTON', '#8a4a22', '#fff3d8') })); sg.position.set(0, 4.75, .22); BAK.add(sg); const ct = box(5, 1.2, 1, 0xc9a26b); ct.position.set(0, .6, 1.6); BAK.add(ct); for (let i = 0; i < 6; i++) { const br = sph(.3, 0xd99a4a); br.scale.set(1.4, .6, .8); br.position.set(-2 + i * .8, 1.35, 1.6); BAK.add(br); } } BAK.position.set(-7.6, 0, 6); BAK.rotation.y = Math.PI / 2; TWN.add(BAK);
+const APT = new THREE.Group(); { const f = box(9, 12, .4, 0xf2d48a); f.position.y = 6; APT.add(f); for (let r = 1; r < 4; r++) { const bal = box(8, .2, 1.2, 0xd9c06a); bal.position.set(0, r * 3, .7); APT.add(bal); } const sg = new THREE.Mesh(new THREE.PlaneGeometry(2.4, .6), new THREE.MeshBasicMaterial({ map: signTex('TÉRREO', '#fff', '#1b120c', 256, 64, 40) })); sg.position.set(2.6, 2.4, .22); APT.add(sg); const el = box(1.8, 2.8, .1, 0x9aa2aa); el.position.set(-2.2, 1.4, .25); APT.add(el); APT.userData.elev = el; } APT.position.set(7.6, 0, -8); APT.rotation.y = -Math.PI / 2; TWN.add(APT);
+// ---------- DAM (on the hill, far end) ----------
+const DAM = new THREE.Group(); DAM.position.set(0, 0, -150); scene.add(DAM); const BOLTS = [];
+{ const G = DAM; const wall = box(60, 22, 6, 0xb8b4aa); wall.position.set(0, 11, 0); G.add(wall); const lake = box(80, .5, 60, 0x2e6e9e, { ink: false }); lake.position.set(0, 19.5, -33); G.add(lake); const walk = box(62, .4, 3, 0x8a8a84); walk.position.set(0, 22.2, 2.5); G.add(walk); const rail = box(62, .12, .12, 0xd8423a, { ink: false }); rail.position.set(0, 23.2, 3.9); G.add(rail); for (let i = 0; i < 20; i++) { const p = box(.1, 1, .1, 0xd8423a, { ink: false }); p.position.set(-30 + i * 3.1, 22.7, 3.9); G.add(p); }
+  for (let gi = 0; gi < 6; gi++) { const x = -20 + gi * 8; const gt = box(5, 8, .5, 0x5a6a7a); gt.position.set(x, 6, 3.2); G.add(gt); const num = new THREE.Mesh(new THREE.PlaneGeometry(1.2, .8), new THREE.MeshBasicMaterial({ map: signTex('' + (gi + 1), '#f2c12e', '#1b120c', 120, 80, 60) })); num.position.set(x, 10.6, 3.46); G.add(num); for (let b = 0; b < 12; b++) { const bt = cyl(.22, .22, .3, 0xd8d8d8, {}, 10); bt.rotation.x = Math.PI / 2; bt.position.set(x - 2.0 + (b % 2) * 4.0, 2.6 + Math.floor(b / 2) * 1.3, 3.55); G.add(bt); BOLTS.push({ m: bt, g: gi, b }); } }
+  const lad = new THREE.Group(); for (const s of [-.4, .4]) { const r = box(.1, 20, .1, 0xcfcfcf, { ink: false }); r.position.set(s, 10, 0); lad.add(r); } for (let i = 0; i < 20; i++) { const st = box(.8, .08, .08, 0xcfcfcf, { ink: false }); st.position.y = i; lad.add(st); } lad.position.set(23.2, 0, 3.7); G.add(lad);
+  for (let i = 0; i < 4; i++) { const lp = cyl(.08, .08, 3, 0x2a2a2a); lp.position.set(-24 + i * 16, 23.9, 1.4); G.add(lp); const lb = sph(.3, 0xfff1c0, { ink: false }); lb.position.set(-24 + i * 16, 25.4, 1.4); G.add(lb); } }
+const damLight = new THREE.PointLight(0xfff1c0, 0, 40, 1.2); scene.add(damLight);
+// ---------- FESTA JUNINA (school court) ----------
+const FES = new THREE.Group(); FES.position.set(200, 0, 0); scene.add(FES); const FLAGS = [];
+{ const G = FES; const fl = box(60, .2, 60, 0x8a7a5a, { ink: false }); fl.position.y = -.1; G.add(fl); const court = box(18, .05, 14, 0xc8b48a, { ink: false }); court.position.set(0, .03, 0); G.add(court); const wall = box(30, 6, .4, 0xe9e2cf); wall.position.set(0, 3, -9); G.add(wall); const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.2), new THREE.MeshBasicMaterial({ map: signTex('FESTA JUNINA DA ESCOLA', '#2b4c9b', '#f2c12e', 700, 90, 50) })); sg.position.set(0, 5, -8.78); G.add(sg);
+  const fc = ['#d8423a', '#f2c12e', '#2e9e5b', '#3f7fb3', '#e86aa0', '#f07a2a']; for (let line = 0; line < 4; line++) { for (let i = 0; i < 18; i++) { const x = -12 + i * 1.4, z = -6 + line * 4, y = 5.6 - Math.sin(i / 17 * Math.PI) * .9; const f = new THREE.Mesh(new THREE.ConeGeometry(.35, .6, 3), new THREE.MeshToonMaterial({ color: fc[(i + line) % 6], gradientMap: grad })); f.rotation.z = Math.PI; f.position.set(x, y, z); G.add(f); FLAGS.push(f); } }
+  for (const x of [-12.8, 12.8]) for (const z of [-6, -2, 2, 6]) { const p = cyl(.1, .1, 6, 0x6b4423); p.position.set(x, 3, z); G.add(p); }
+  const fire = new THREE.Group(); for (let i = 0; i < 6; i++) { const l = cyl(.15, .15, 2.2, 0x6b4423); l.rotation.set(Math.cos(i) * .9, i, Math.sin(i) * .9); l.position.y = .6; fire.add(l); } const fl1 = M(new THREE.ConeGeometry(.9, 2.2, 8), 0xff8a2a, { ink: false }); fl1.position.y = 1.6; fire.add(fl1); const fl2 = M(new THREE.ConeGeometry(.5, 1.5, 8), 0xffd24a, { ink: false }); fl2.position.y = 1.7; fire.add(fl2); fire.position.set(7, 0, -5); G.add(fire); G.userData.fire = [fl1, fl2]; }
+const fireLight = new THREE.PointLight(0xff9a3a, 0, 30, 1.2); scene.add(fireLight);
+// ---------- HOUSE (kitchen) ----------
+const HOU = new THREE.Group(); HOU.position.set(300, 0, 0); scene.add(HOU);
+{ const G = HOU; const fl = box(16, .2, 14, 0x9a7a5a, { ink: false }); fl.position.y = -.1; G.add(fl); const bw = box(16, 8, .2, 0xd9c8a8, { ink: false }); bw.position.set(0, 4, -3); G.add(bw); const sw = box(.2, 8, 14, 0xc9b898, { ink: false }); sw.position.set(-6, 4, 3); G.add(sw); const ct = box(4.4, 1.8, 1.3, 0x8a5a33); ct.position.set(-2.6, .9, -2.3); G.add(ct); const tp = box(4.6, .14, 1.5, 0xe9e2d0); tp.position.set(-2.6, 1.86, -2.3); G.add(tp); const sink = box(1.4, .3, .9, 0xc8ccd0); sink.position.set(-2.6, 1.8, -2.3); G.add(sink); const fau = cyl(.06, .06, .7, 0xc8ccd0); fau.position.set(-2.6, 2.2, -2.7); G.add(fau); const win = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.6), new THREE.MeshBasicMaterial({ color: 0xffe9b0 })); win.position.set(-.2, 4.4, -2.88); G.add(win); G.userData.win = win; const stream = cyl(.05, .05, .6, 0x7fc8f0, { ink: false }); stream.position.set(-2.6, 2.0, -2.35); G.add(stream); G.userData.stream = stream; const tbl = box(2.6, .15, 1.6, 0x7a4a2a); tbl.position.set(2.6, 1.6, -.4); G.add(tbl); for (const x of [1.5, 3.7]) for (const z of [-1.0, .2]) { const l = box(.15, 1.6, .15, 0x5a3418, { ink: false }); l.position.set(x, .8, z); G.add(l); } }
+// ---------- GYM ----------
+const GYM = new THREE.Group(); GYM.position.set(400, 0, 0); scene.add(GYM);
+{ const G = GYM; const fl = box(80, .2, 80, 0x5f9a3a, { ink: false }); fl.position.y = -.1; G.add(fl); const b = box(22, 8, 14, 0xe9e6dc); b.position.set(0, 4, -8); G.add(b); const rf = M(new THREE.CylinderGeometry(9, 9, 22, 24, 1, false, 0, Math.PI), 0x9aa2aa); rf.rotation.z = Math.PI / 2; rf.scale.set(1, 1, .6); rf.position.set(0, 8, -8); G.add(rf); const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.3), new THREE.MeshBasicMaterial({ map: signTex('GINÁSIO MUNICIPAL', '#2b4c9b', '#fff', 700, 90, 54) })); sg.position.set(0, 6.6, -.98); G.add(sg); const d = box(4, 3.6, .1, 0x3a4a5a); d.position.set(0, 1.8, -.95); G.add(d); const pod = box(1.6, 1.6, .9, 0x6b4423); pod.position.set(-5, .8, 3); G.add(pod); }
+// ---------- TRUCK (pickup with sacks, boat, vest) ----------
+const TRK = new THREE.Group(); const SACKS = []; { const cab = box(2.4, 1.6, 2.2, 0x3f6fa8); cab.position.set(0, 1.6, -1.2); TRK.add(cab); const hood = box(2.4, 1.0, 1.4, 0x3f6fa8); hood.position.set(0, 1.2, -2.9); TRK.add(hood); const bed = box(2.6, .25, 3.4, 0x2a3a5a); bed.position.set(0, 1.0, 1.7); TRK.add(bed); for (const s of [-1, 1]) { const sd = box(.15, .8, 3.4, 0x3f6fa8); sd.position.set(s * 1.25, 1.5, 1.7); TRK.add(sd); } const tg = box(2.6, .8, .15, 0x3f6fa8); tg.position.set(0, 1.5, 3.4); TRK.add(tg); for (const z of [-2.6, 2.0]) for (const s of [-1, 1]) { const w = cyl(.5, .5, .4, 0x1e1e1e); w.rotation.z = Math.PI / 2; w.position.set(s * 1.25, .5, z); TRK.add(w); } for (const s of [-.7, .7]) { const hl = sph(.15, 0xfff6c9, { ink: false }); hl.position.set(s, 1.3, -3.62); TRK.add(hl); }
+  for (let i = 0; i < 5; i++) { const sk = M(new THREE.SphereGeometry(.42, 12, 10), 0xc9a26b); sk.scale.set(1, .9, 1.1); sk.position.set(-.6 + (i % 2) * 1.0, 1.55, .6 + Math.floor(i / 2) * .85); TRK.add(sk); SACKS.push(sk); }
+  const boat = new THREE.Group(); const tube = M(new THREE.TorusGeometry(.7, .26, 10, 24), 0xf07a2a); tube.rotation.x = Math.PI / 2; tube.scale.set(.8, 1.4, 1); boat.add(tube); const fl = cyl(.6, .6, .08, 0x3a3a3a, { ink: false }); fl.scale.z = 1.6; boat.add(fl); boat.position.set(.35, 1.5, 2.7); boat.rotation.y = .2; TRK.add(boat); TRK.userData.boat = boat;
+  const vest = new THREE.Group(); const v1 = box(.6, .7, .25, 0xf2a12e); vest.add(v1); const v2 = box(.62, .1, .27, 0xffffff, { ink: false }); v2.position.y = .1; vest.add(v2); vest.position.set(-.75, 1.55, 2.75); TRK.add(vest); TRK.userData.vest = vest; }
+scene.add(TRK); ALL.push(TRK);
+const OPENSACK = new THREE.Group(); { const s = M(new THREE.SphereGeometry(.9, 16, 12, 0, Math.PI * 2, Math.PI * .25, Math.PI * .75), 0xc9a26b); s.rotation.x = Math.PI; s.position.y = .9; OPENSACK.add(s); for (let i = 0; i < 6; i++) { const b = new THREE.Group(); const sh = cyl(.12, .12, 1.0, 0xb8bcc2); b.add(sh); const hd = cyl(.24, .24, .2, 0xb8bcc2, {}, 6); hd.position.y = .55; b.add(hd); b.position.set(-.4 + (i % 3) * .4, 1.5, -.2 + Math.floor(i / 3) * .4); b.rotation.z = (i - 2.5) * .15; OPENSACK.add(b); } const tag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .5), new THREE.MeshBasicMaterial({ map: signTex('COMPORTA 6', '#fffaf0', '#1b120c', 280, 100, 46), side: THREE.DoubleSide })); tag.position.set(0, .6, .95); OPENSACK.add(tag); } scene.add(OPENSACK); ALL.push(OPENSACK);
+
+// ---------- moods ----------
+function day(k = 1) { HOU.userData.win.material.color.set(0xffe9b0); hemi.intensity = 1.3 * k; hemi.color.set(0xfff1d6); hemi.groundColor.set(0x6d5a3a); sun.intensity = 1.6 * k; scene.background = new THREE.Color(k < 1 ? 0xf0a870 : 0xa9d6ec); scene.fog = new THREE.Fog(k < 1 ? 0xf0a870 : 0xbfe0ef, 80, 420); damLight.intensity = 0; fireLight.intensity = 0; beam.intensity = 0; TWN.traverse(o => { if (o.userData.win) o.material.color.set(0x3a4a5a); }); TWN.userData.lamps.forEach(l => l.material.color.set(0xfff1c0)); }
+function night(k = 1, lampsOn = true) { hemi.intensity = .5 * k; hemi.color.set(0x8a9ae8); hemi.groundColor.set(0x1a1a33); sun.intensity = .15 * k; scene.background = new THREE.Color(0x0c1022); scene.fog = new THREE.Fog(0x0c1022, 40, 300); damLight.intensity = 0; fireLight.intensity = 0; beam.intensity = 0; TWN.traverse(o => { if (o.userData.win) o.material.color.set(lampsOn ? 0xffd27a : 0x141820); }); TWN.userData.lamps.forEach(l => l.material.color.set(lampsOn ? 0xfff1c0 : 0x2a2a30)); }
+function blackout() { night(.25, false); hemi.intensity = .18; HOU.userData.win.material.color.set(0x1a2040); }
+function hideAll() { ALL.forEach(c => c.visible = false); }
+function torchAt(x, y, z, dir, on = true) { TORCH.visible = true; TORCH.position.set(x, y, z); TORCH.lookAt(x + dir[0], y + dir[1], z + dir[2]); beam.intensity = on ? 60 : 0; beam.position.set(x, y, z); beam.target.position.set(x + dir[0] * 10, y + dir[1] * 10, z + dir[2] * 10); }
+const DAMZ = -150;
+
+// ---------- shots ----------
+const SH = []; const shot = (t0, fn) => SH.push({ t0, fn });
+const crowd = (list, x0, z0, gap = 1.6, opt = {}) => list.forEach((c, i) => pose(c, { pos: [x0 + (i % 5) * gap - gap * 2, 0, z0 - Math.floor(i / 5) * 1.8], ry: opt.ry || 0, e: opt.e || blinkE(opt.t || 0, 'neutral', i), walk: opt.walk ? (opt.t || 0) * 6 + i : null, hy: opt.hy || 0, look: opt.look || 0 }));
+// 0 HOOK: town at dusk, crowd; lights go off → everyone glows
+shot(0, (t, lt) => { const off = t > 1.6; if (!off) day(.7); else blackout(); crowd(TOWN, 0, 14, 1.7, { t, e: off ? 'shock' : 'neutral' }); if (off) TOWN.forEach((c, i) => glow(c, ['yellow', 'pink', 'grey', 'blue'][i % 4]));
+  SHAKE = off && t < 2.0 ? .1 : .02; const k = eio(cl(lt / 2.5)); cam(L3([0, 9, 34], [0, 3.6, 22], k), [0, 2, 12], 44, lt); SH.ov = () => { counter('TODO MUNDO NASCE', W / 2, 300, prog(t, .1, .45), 104, '#fff'); counter('COM UMA COR', W / 2, 430, prog(t, 1.6, 1.9), 120, '#3fe0ff'); }; });
+// 1 it only appears when the lights go out, and shows how you'll die
+shot(2.48, (t, lt) => { blackout(); crowd(TOWN, 0, 14, 1.7, { t, e: 'worried' }); TOWN.forEach((c, i) => glow(c, ['yellow', 'pink', 'grey', 'blue'][i % 4])); SHAKE = 0; const k = eio(cl(lt / 3.7)); cam(L3([-8, 3.2, 22], [8, 3.0, 22], k), [0, 2.2, 12], 40, lt); SH.ov = () => { sub('QUANDO A LUZ APAGA', W / 2, 300, prog(t, 3.6, 3.9)); counter('COMO VOCÊ VAI MORRER', W / 2, 440, prog(t, 5.12, 5.4), 90, '#ff6a5a'); }; });
+// 2 yellow = shock: Mr. Newton left the electrician job
+shot(6.24, (t, lt) => { const dark = t < 7.5; if (dark) { blackout(); glow(NEWT, 'yellow'); } else day(); pose(NEWT, { pos: [-3, 0, 12], ry: .5, e: dark ? 'shock' : 'smile', aR: t > 8.4 ? -1.2 : 0 }); TOOLBOX.visible = !dark; TOOLBOX.position.set(-2.1, lerp(1.0, .25, eio(prog(t, 8.5, 9.0))), lerp(12.7, 13.3, prog(t, 8.5, 9.0))); TOOLBOX.rotation.z = prog(t, 8.5, 9.0) * 1.4;
+  SHAKE = dark ? .02 : 0; cam([1.5, 3.2, 20], [-2, 2.2, 12], 40, lt); SH.ov = () => { label3d('AMARELO = CHOQUE', -3, 4.2, 12, prog(t, 6.3, 6.6), '#1b120c', '#ffe14a', 40); if (!dark) { label3d('ELETRICISTA', -2.1, 1.5, 13.3, prog(t, 8.9, 9.2), '#fff', '#d8423a', 34); } if (dark) { for (let i = 0; i < 5; i++) { const [X, Y] = scr(-3 + Math.sin(t * 20 + i) * .6, 2.6 + Math.cos(t * 17 + i) * .6, 12); o2.strokeStyle = '#ffe14a'; o2.lineWidth = 5; o2.beginPath(); o2.moveTo(X, Y); o2.lineTo(X + 20, Y + 30); o2.lineTo(X + 5, Y + 34); o2.lineTo(X + 25, Y + 70); o2.stroke(); } } }; });
+// 3 ...and opened a bakery
+shot(10.1, (t, lt) => { day(); pose(NEWT, { pos: [-6.2, 0, 6], ry: Math.PI / 2, e: 'happy', aL: -1.1, aR: -1.1 }); hats(NEWT, false); SHAKE = 0; const k = eio(cl(lt / 1.1)); cam(L3([3.6, 3.2, 10], [2.4, 3.0, 8], k), [-6.4, 2.6, 6], 42, lt); SH.ov = () => sparkle(...scr(-7.4, 4.8, 6).slice(0, 2), prog(t, 10.2, 10.9)); });
+// 4 pink = falling: Mrs. Célia lives on the ground floor, never took an elevator
+shot(11.22, (t, lt) => { const dark = t < 12.3; if (dark) { blackout(); glow(CELIA, 'pink'); } else day(); pose(CELIA, { pos: [6.2, 0, -6.2], ry: -Math.PI / 2 - .3, e: dark ? 'worried' : (t > 14 ? 'suspect' : 'smile'), hy: t > 14 ? .6 : 0, aR: t > 14 ? -.9 : 0 });
+  SHAKE = 0; const k = eio(cl(lt / 4)); cam(L3([-.5, 3.0, -3], [0, 3.4, -1], k), [6.4, 2.2, -7.2], 42, lt); SH.ov = () => { label3d('ROSA = QUEDA', 6.2, 3.7, -6.2, prog(t, 11.3, 11.6), '#fff', '#ff7ac8', 40); if (t > 14.5) { const [X, Y] = scr(7.4, 1.6, -10.2); o2.save(); o2.strokeStyle = '#d8423a'; o2.lineWidth = 18; o2.lineCap = 'round'; const k2 = eback(prog(t, 14.6, 14.9)); o2.translate(X, Y); o2.scale(k2, k2); o2.beginPath(); o2.moveTo(-70, -70); o2.lineTo(70, 70); o2.moveTo(70, -70); o2.lineTo(-70, 70); o2.stroke(); o2.restore(); } }; });
+// 5 grey = what everyone wants: die very old, sleeping
+shot(15.3, (t, lt) => { blackout(); hemi.intensity = .3; glow(VOVO, 'grey'); pose(VOVO, { pos: [0, 0, 16.1], sit: true, e: 'sleep', hx: .15 + Math.sin(t * 1.5) * .03 }); CHAIR.visible = true; CHAIR.position.set(0, 0, 15.8); SHAKE = 0; const k = eio(cl(lt / 4)); cam(L3([3.2, 3.4, 24.5], [1.4, 2.9, 22.5], k), [0, 1.9, 16], 40, lt);
+  SH.ov = () => { label3d('CINZA', 0, 3.9, 16, prog(t, 15.46, 15.75), '#1b120c', '#d8dce4', 44); sub('BEM VELHINHO, DORMINDO', W / 2, 440, prog(t, 17.94, 18.2)); for (let i = 0; i < 3; i++) { const p = ((t * .6 + i / 3) % 1); o2.globalAlpha = 1 - p; T('z', 700 + p * 60, 820 - p * 200, 40 + i * 14, '#d8dce4', { w: 900 }); } o2.globalAlpha = 1; }; });
+// 6 my whole family is grey: me, mom and dad
+shot(19.3, (t, lt) => { blackout(); [KID, MOM, DAD].forEach(c => glow(c, 'grey')); pose(DAD, { pos: [1.4, 0, 16], ry: -.2, e: 'smile' }); pose(MOM, { pos: [-1.4, 0, 16], ry: .2, e: 'smile' }); pose(KID, { pos: [0, 0, 16.9], s: .78, e: 'smile' });
+  SHAKE = 0; const k = eio(cl(lt / 3.3)); cam(L3([0, 3.8, 29], [0, 3.2, 26], k), [0, 2.0, 16], 40, lt); SH.ov = () => { counter('FAMÍLIA CINZA', W / 2, 300, prog(t, 20.26, 20.6), 120, '#d8dce4'); [['EU', 0, 2.6, 16.9, 20.98], ['MÃE', -1.4, 3.6, 16, 21.62], ['PAI', 1.4, 3.6, 16, 22.34]].forEach(([s, x, y, z, tt]) => label3d(s, x, y, z, prog(t, tt, tt + .3), '#1b120c', '#d8dce4', 34)); }; });
+// 7 our town is in a valley, below a dam (crane up)
+shot(22.66, (t, lt) => { day(.95); crowd(TOWN, 0, 18, 2.0, { t, walk: true }); SHAKE = 0; const k = eio(cl(lt / 3.5)); cam(L3([0, 4, 40], [0, 40, 70], k), L3([0, 4, 0], [0, 10, DAMZ], k), 46, lt); SH.ov = () => { counter('UM VALE', W / 2, 300, prog(t, 23.94, 24.2), 140, '#fff'); if (t > 24.4) counter('E UMA REPRESA', W / 2, 430, prog(t, 24.42, 24.7), 110, '#3fa8ff'); }; });
+// 8 dad has taken care of the dam for 20 years
+shot(26.15, (t, lt) => { day(.95); pose(DAD, { pos: [-6, 22.4, DAMZ + 2.4], e: 'happy', aR: -2.6, aRz: -.3 + Math.sin(t * 8) * .3 }); SHAKE = 0; const k = eio(cl(lt / 2.2)); cam(L3([2, 24.5, DAMZ + 16], [-2, 24.6, DAMZ + 12], k), [-6, 23.8, DAMZ + 2.4], 40, lt); SH.ov = () => counter('20 ANOS', W / 2, 330, prog(t, 27.75, 28.0), 150, '#fff'); });
+// 9 every gate has 12 bolts — kids learn it
+shot(28.39, (t, lt) => { day(.95); const n = Math.min(12, Math.floor(prog(t, 31.0, 33.4) * 12) + (t > 31 ? 1 : 0)); BOLTS.forEach(o => { o.m.material.color.set(o.g === 2 && o.b < n ? 0xf2c14e : 0xd8d8d8); o.m.scale.setScalar(o.g === 2 && o.b === n - 1 ? 1.4 : 1); }); pose(DAD, { pos: [-4.0, 0, DAMZ + 7.2], ry: .6, e: talk(t), aR: -1.4 }); [KID, TOWN[3], TOWN[6]].forEach((c, i) => pose(c, { pos: [-6 + i * 1.6, 0, DAMZ + 11 + (i % 2) * .6], ry: Math.PI - .2, s: .75, e: 'neutral' }));
+  SHAKE = 0; const k = eio(cl(lt / 5.5)); cam(L3([-9, 4, DAMZ + 21], [-4, 6.5, DAMZ + 17.5], k), [-4, 4.5, DAMZ + 3.5], 42, lt); SH.ov = () => { counter(n + ' PARAFUSOS', W / 2, 330, prog(t, 31.0, 31.3), 130, '#f6d33c'); sub('CADA COMPORTA', W / 2, 460, prog(t, 31.99, 32.3)); }; });
+// 10 festa junina at school; the lights go out in the middle of the quadrilha
+shot(34.15, (t, lt) => { const off = t > 36.15; if (!off) { night(1, true); fireLight.intensity = 6 + Math.sin(t * 17) * 1.2; fireLight.position.set(207, 2, -5); } else blackout(); const G = FES;
+  const dancers = [...TOWN.slice(0, 8), KID, MOM]; dancers.forEach((c, i) => { hats(c, true); const a = i / dancers.length * Math.PI * 2 + (off ? 0 : t * .8); pose(c, { pos: [200 + Math.cos(a) * 4.5, Math.abs(Math.sin(t * 6 + i)) * (off ? 0 : .15), Math.sin(a) * 3.2], ry: -a, e: off ? 'shock' : 'happy', aL: off ? 0 : -2.4, aR: off ? 0 : -2.4, s: c === KID ? .78 : 1 }); });
+  G.userData.fire.forEach((f, i) => f.scale.set(1, 1 + Math.sin(t * 14 + i) * .15, 1)); FLAGS.forEach((f, i) => f.rotation.x = Math.sin(t * 3 + i) * .2);
+  SHAKE = off && t < 36.6 ? .12 : .01; const k = eio(cl(lt / 3.7)); cam(L3([210, 6.4, 13], [206, 4.6, 10], k), [200, 1.6, 0], 44, lt); SH.ov = () => { counter('FESTA JUNINA', W / 2, 300, prog(t, 34.63, 34.9), 120, '#f6d33c'); if (off) counter('A LUZ ACABOU', W / 2, 440, prog(t, 36.15, 36.45), 110, '#fff'); }; });
+// 11 everyone, without exception, glowing blue. Blue is drowning
+shot(37.9, (t, lt) => { blackout(); const dancers = [...TOWN.slice(0, 8), KID, MOM]; dancers.forEach((c, i) => { hats(c, true); glow(c, 'blue'); const a = i / dancers.length * Math.PI * 2; pose(c, { pos: [200 + Math.cos(a) * 4.5, 0, Math.sin(a) * 3.2], ry: -a, e: 'shock', s: c === KID ? .78 : 1, look: Math.sin(t + i) }); });
+  SHAKE = .02; const k = eio(cl(lt / 4.4)); cam(L3([200, 7, 15], [200, 4.6, 11], k), [200, 1.8, 0], 46, lt); SH.ov = () => { counter('TODO MUNDO AZUL', W / 2, 300, prog(t, 40.46, 40.75), 110, '#3fe0ff'); if (t > 40.9) counter('AZUL = AFOGAMENTO', W / 2, 440, prog(t, 41.5, 41.8), 84, '#fff'); }; });
+// 12 everyone looked at the same thing: the dam
+shot(42.3, (t, lt) => { blackout(); hemi.intensity = .3; crowd(TOWN, 0, 20, 1.7, { t, ry: Math.PI, e: 'shock', hy: 0 }); TOWN.forEach(c => { glow(c, 'blue'); hats(c, true); }); SHAKE = 0; const k = eio(cl(lt / 2.4)); cam(L3([0, 3, 30], [0, 6, 36], k), [0, 12, DAMZ], 34, lt); scene.fog = new THREE.Fog(0x0c1022, 100, 700); damLight.intensity = 40; damLight.position.set(0, 26, DAMZ + 12); SH.ov = () => counter('A REPRESA', W / 2, 330, prog(t, 44.22, 44.5), 150, '#3fa8ff'); });
+// 13 dad wasn't at the party — he was on duty at the dam
+shot(44.78, (t, lt) => { night(.9); damLight.intensity = 6; damLight.position.set(-6, 25, DAMZ + 4); pose(DAD, { pos: [-8 + lt * 1.2, 22.4, DAMZ + 2.4], ry: Math.PI / 2, walk: t * 5, e: 'neutral', aR: -1.4 }); torchAt(-8 + lt * 1.2 + .5, 23.9, DAMZ + 3.1, [1, -.25, 0]); SHAKE = 0; cam([-2 + lt, 25, DAMZ + 16], [-6 + lt, 23.6, DAMZ + 2], 40, lt); SH.ov = () => sub('DE PLANTÃO', W / 2, 330, prog(t, 46.86, 47.1)); });
+// 14 mom looked alone in the dark: she was blue too
+shot(48.0, (t, lt) => { blackout(); glow(MOM, 'blue'); pose(MOM, { pos: [300 + .5, 0, .6], ry: -.3, e: 'cry', aL: -.4, aR: -.4 }); SHAKE = 0; const k = eio(cl(lt / 3)); cam(L3([300 + 2, 3.0, 7], [300 + 1.4, 2.6, 4.6], k), [300 + .5, 2.2, .6], 40, lt); SH.ov = () => counter('AZUL TAMBÉM', W / 2, 330, prog(t, 50.32, 50.6), 130, '#3fe0ff'); });
+// 15 a sleepless week; every time someone asked, dad said: "relax, I take care of the dam"
+shot(51.04, (t, lt) => { const day_ = t > 53.3; if (day_) day(); else night(1, true); if (!day_) { crowd(TOWN.slice(0, 5), 0, 12, 1.8, { t, e: 'tired' }); SHAKE = 0; cam([0, 22, 40], [0, 4, 0], 46, lt); }
+  else { pose(DAD, { pos: [1.4, 0, 10], ry: -.6, e: t > 58.1 ? talk(t) : 'smile', aR: t > 58 ? -1.2 : 0, aRz: .2 }); pose(TOWN[1], { pos: [-.8, 0, 10.6], ry: .7, e: t < 56.5 ? talk(t) : 'worried' }); pose(TOWN[4], { pos: [-1.6, 0, 9.0], ry: .9, e: 'worried' }); SHAKE = 0; const k = eio(cl((t - 53.3) / 6)); cam(L3([-1, 3.8, 21], [.2, 3.2, 18], k), [.2, 2.3, 10], 42, t - 53.3); }
+  SH.ov = () => { if (!day_) counter('NINGUÉM DORMIU', W / 2, 330, prog(t, 52.08, 52.4), 120, '#fff'); else { speech('A represa vai\naguentar?', -.8, 3.6, 10.6, prog(t, 54.24, 54.5) * (1 - prog(t, 57.9, 58.0))); speech('Fica tranquilo,\neu cuido da represa.', 1.4, 3.6, 10, prog(t, 58.18, 58.45)); } }; });
+// 16 the mayor's plan: saturday night everyone sleeps together in the school gym
+shot(59.78, (t, lt) => { day(); pose(PREF, { pos: [395, 0, 2.0], ry: .2, e: talk(t), aR: -1.5 }); crowd(TOWN, 400, 14, 1.8, { t, ry: Math.PI, e: 'neutral' }); SHAKE = 0; const k = eio(cl(lt / 5.3)); cam(L3([392, 4, 22], [396, 6, 18], k), [398, 3.4, -2], 44, lt);
+  SH.ov = () => { o2.save(); const k2 = eback(prog(t, 61.22, 61.6)); o2.translate(W / 2, 560); o2.rotate(-.03); o2.scale(k2, k2); o2.fillStyle = '#fbf6ea'; o2.shadowColor = 'rgba(0,0,0,.4)'; o2.shadowBlur = 24; rr(o2, -320, -230, 640, 460, 18); o2.fill(); o2.shadowColor = 'transparent'; o2.fillStyle = '#2b4c9b'; rr(o2, -320, -230, 640, 90, 18); o2.fill(); o2.fillRect(-320, -170, 640, 30); T('PREFEITURA', 0, -184, 46, '#fff', { w: 900 }); T('SÁBADO À NOITE', 0, -40, 60, '#1b120c', { w: 900 }); T('TODOS NO', 0, 50, 52, '#1b120c', { w: 800 }); T('GINÁSIO', 0, 130, 80, '#c0392b', { w: 900 }); o2.restore(); }; });
+// 17 it was dad's suggestion — the strongest building in town
+shot(65.14, (t, lt) => { day(); pose(DAD, { pos: [398.6, 0, 3.2], ry: .8, e: 'smile', aR: -1.3 }); pose(PREF, { pos: [401.4, 0, 3.2], ry: -.8, e: 'happy', aL: -1.3 }); SHAKE = 0; const k = eio(cl(lt / 3)); cam(L3([400, 3.2, 14], [400, 4.6, 11], k), [400, 3.2, 0], 42, lt); SH.ov = () => { counter('O PRÉDIO MAIS FORTE', W / 2, 300, prog(t, 66.5, 66.8), 96, '#fff'); sub('IDEIA DO MEU PAI', W / 2, 430, prog(t, 65.86, 66.1), '#f6d33c'); }; });
+// 18 nobody worked harder: every night at the dam, back in the morning with greasy black hands
+shot(68.15, (t, lt) => { const cyc = (lt / 1.3) % 1; const isN = cyc < .5; if (t < 72.3) { if (isN) night(1); else day(); pose(DAD, { pos: [lerp(-4, 4, cyc), 0, 12], ry: Math.PI / 2, walk: t * 7, e: 'tired' }); SHAKE = 0; cam([0, 3.4, 22], [0, 2.4, 12], 42, lt); }
+  else { day(); HOU.userData.stream.visible = true; pose(DAD, { pos: [297.4, 0, -.6], ry: 0, e: 'tired', aL: -1.7, aR: -1.7, hx: .3 }); DAD.userData.parts.arms.forEach(a => a.children[1].material.color.set(0x1b1b1b)); SHAKE = 0; cam([298.4, 2.9, 5.2], [297.4, 2.0, -.6], 40, lt - 4.15); }
+  SH.ov = () => { if (t < 72.3) { o2.save(); o2.translate(W / 2, 330); o2.rotate(lt * 4.8); o2.fillStyle = isN ? '#f4efd8' : '#ffd23f'; o2.beginPath(); o2.arc(0, -120, 50, 0, 7); o2.fill(); o2.restore(); } else counter('MÃOS PRETAS DE GRAXA', W / 2, 300, prog(t, 72.87, 73.1), 90, '#fff'); }; });
+// 19 he looked so worried; tonight he took me along: "hold the flashlight, son"
+shot(74.15, (t, lt) => { night(.9); TRK.visible = true; TRK.position.set(lerp(-6, -2, eio(cl(lt / 2))), 0, DAMZ + 12); TRK.rotation.y = -Math.PI / 2; pose(DAD, { pos: [2, 0, DAMZ + 9.5], ry: .7, e: t > 77.19 ? talk(t) : 'worried' }); pose(KID, { pos: [3.6, 0, DAMZ + 10.3], ry: -1.0, s: .78, e: 'worried', aR: -1.3 }); torchAt(3.0, 1.2, DAMZ + 10.5, [-.6, .6, -.5], t > 77.6);
+  SHAKE = 0; const k = eio(cl(lt / 4.2)); cam(L3([5.5, 3.8, DAMZ + 20], [4.6, 3.2, DAMZ + 17], k), [2.4, 1.8, DAMZ + 9.8], 42, lt); SH.ov = () => speech('Segura a lanterna,\nfilho.', 2, 3.8, DAMZ + 9.5, prog(t, 77.19, 77.45)); });
+// 20 he went down to the last gate, wrench in hand; heavy sacks in the truck bed
+shot(78.44, (t, lt) => { night(.9); const p = eio(prog(t, 78.6, 80.8)); pose(DAD, { pos: [23.2, lerp(21.6, 4, p), DAMZ + 4.1], ry: Math.PI, e: 'neutral', aL: -2.7, aR: -2.6 }); WRENCH.visible = true; WRENCH.position.set(23.6, DAD.position.y + 2.4, DAMZ + 4.4); torchAt(21.6, 23.4, DAMZ + 3.6, [.5, -1, .1]); TRK.visible = true; TRK.position.set(-2, 0, DAMZ + 12); TRK.rotation.y = -Math.PI / 2;
+  SHAKE = 0; if (t < 81.0) cam([30, 14, DAMZ + 20], [22, DAD.position.y + 1, DAMZ + 4], 42, lt); else { damLight.intensity = 3; damLight.position.set(-2, 6, DAMZ + 16); const k = eio(cl((t - 81) / 2.7)); cam(L3([4, 6, DAMZ + 20], [2, 5.4, DAMZ + 18], k), [-2.4, 1.4, DAMZ + 12], 40, t - 81); }
+  SH.ov = () => { if (t < 81) sub('ÚLTIMA COMPORTA', W / 2, 330, prog(t, 79.24, 79.5)); else counter('SACOS PESADOS', W / 2, 330, prog(t, 82.68, 83.0), 120, '#fff'); }; });
+// 21 I opened one: bolts! huge bolts, labeled: GATE ... one sack per gate
+shot(83.72, (t, lt) => { night(.9); damLight.intensity = 3; damLight.position.set(-2, 6, DAMZ + 16); OPENSACK.visible = true; OPENSACK.position.set(0, 0, DAMZ + 20); TRK.visible = true; TRK.position.set(-2, 0, DAMZ + 12); TRK.rotation.y = -Math.PI / 2; pose(KID, { pos: [1.6, 0, DAMZ + 21.2], ry: -1.8, s: .78, e: 'shock' }); torchAt(1.1, 1.4, DAMZ + 21.0, [-.8, -.4, -.4]);
+  SHAKE = t > 84.4 && t < 84.8 ? .08 : 0; const k = eio(cl(lt / 4)); if (t < 88.5) cam(L3([1.2, 3.8, DAMZ + 26.5], [.8, 3.2, DAMZ + 24.8], k), [.7, 1.3, DAMZ + 20.5], 40, lt); else cam([-3.4, 6.8, DAMZ + 17], [-3.4, 1.4, DAMZ + 12], 42, t - 88.5);
+  SH.ov = () => { counter('PARAFUSOS!', W / 2, 300, prog(t, 84.44, 84.75), 140, '#f6d33c'); if (t > 88.5) { ['COMPORTA 1', 'COMPORTA 2', 'COMPORTA 3', 'COMPORTA 4', 'COMPORTA 5'].forEach((s, i) => { const sk = SACKS[i]; const wp = new THREE.Vector3(); sk.getWorldPosition(wp); label3d(s, wp.x, wp.y + .7 + (i % 2) * .7, wp.z, prog(t, 88.6 + i * .2, 88.9 + i * .2), '#1b120c', '#fffaf0', 26); }); } }; });
+// 22 only the last was missing; the flashlight went out; dark
+shot(90.54, (t, lt) => { const out_ = t > 92.46; if (!out_) { night(.8); damLight.intensity = 2; damLight.position.set(20, 8, DAMZ + 8); } else blackout(); pose(DAD, { pos: [19.8, 0, DAMZ + 5.2], ry: Math.PI, e: 'neutral', aR: -2.0 }); pose(KID, { pos: [17.6, 0, DAMZ + 8], ry: Math.PI - .6, s: .78, e: out_ ? 'shock' : 'worried', aR: -1.3 }); const flick = t > 91.9 && t < 92.46 && Math.sin(t * 60) > 0; torchAt(17.4, 1.55, DAMZ + 7.5, [.3, .2, -1], !out_ && !flick);
+  SHAKE = 0; cam([15, 3.4, DAMZ + 15], [19, 3.6, DAMZ + 4], 40, lt); SH.ov = () => { if (!out_) sub('SÓ FALTAVA A ÚLTIMA', W / 2, 330, prog(t, 90.7, 91.0)); else counter('ESCURO', W / 2, 330, prog(t, 93.1, 93.4), 140, '#fff'); }; });
+// 23 I was glowing blue; dad was glowing grey
+shot(93.66, (t, lt) => { blackout(); hemi.intensity = .12; glow(KID, 'blue'); glow(DAD, 'grey'); pose(DAD, { pos: [19.8, 0, DAMZ + 5.2], ry: .3, e: 'neutral' }); pose(KID, { pos: [17.6, 0, DAMZ + 7.2], ry: -.4, s: .78, e: 'shock', look: 1 });
+  SHAKE = 0; if (t < 95.5) cam([15.2, 2.3, DAMZ + 12.2], [17.6, 1.5, DAMZ + 7.2], 38, lt); else cam([21.8, 3.3, DAMZ + 11.5], [19.8, 2.4, DAMZ + 5.2], 38, t - 95.5); SH.ov = () => { label3d('AZUL', 17.6, 2.7, DAMZ + 7.2, prog(t, 95.1, 95.4), '#1b120c', '#3fe0ff', 40); if (t > 95.5) label3d('CINZA', 19.8, 3.8, DAMZ + 5.2, prog(t, 96.78, 97.05), '#1b120c', '#d8dce4', 40); }; });
+// 24 in his grey light I saw the rest of the truck bed: a boat already inflated and ONE life vest
+shot(98.67, (t, lt) => { blackout(); hemi.intensity = .4; hemi.color.set(0xc8ccd8); TRK.visible = true; TRK.position.set(-2, 0, DAMZ + 12); TRK.rotation.y = -Math.PI / 2; SHAKE = 0; const k = eio(cl(lt / 4.9)); cam(L3([-8.5, 4.6, DAMZ + 15.5], [-7.6, 3.8, DAMZ + 14.2], k), [-4.6, 1.5, DAMZ + 11.8], 40, lt);
+  SH.ov = () => { const bw = new THREE.Vector3(); TRK.userData.boat.getWorldPosition(bw); label3d('BOTE', bw.x, bw.y + 1.0, bw.z, prog(t, 100.19, 100.5), '#fff', '#f07a2a', 36); const vw = new THREE.Vector3(); TRK.userData.vest.getWorldPosition(vw); label3d('1 COLETE', vw.x, vw.y + .9, vw.z, prog(t, 101.87, 102.2), '#1b120c', '#f2a12e', 36); if (t > 103.07) counter('UM SÓ.', W / 2, 330, prog(t, 103.07, 103.35), 150, '#ff6a5a'); }; });
+// 25 without the bolts the gates won't hold — and tomorrow the whole town will be in the gym, the lowest point of the valley
+shot(103.63, (t, lt) => { night(1, true); SHAKE = .02; const k = eio(cl(lt / 6.8)); cam(L3([40, 60, DAMZ - 20], [30, 50, 60], k), [0, 0, -20], 48, lt);
+  SH.ov = () => { const [x1, y1] = scr(0, 18, DAMZ), [x2, y2] = scr(0, 1, 12); const p = eio(prog(t, 104.8, 107.6)); o2.save(); o2.strokeStyle = 'rgba(63,168,255,.75)'; o2.lineWidth = 60; o2.lineCap = 'round'; o2.beginPath(); o2.moveTo(x1, y1); o2.lineTo(lerp(x1, x2, p), lerp(y1, y2, p)); o2.stroke(); o2.restore(); if (t > 108.4) counter('O PONTO MAIS BAIXO', W / 2, 330, prog(t, 109.36, 109.65), 100, '#ff6a5a'); else counter('SEM OS PARAFUSOS', W / 2, 330, prog(t, 103.95, 104.25), 100, '#fff'); }; });
+// 26 I hit the flashlight and it lit up
+shot(110.64, (t, lt) => { const on = t > 112.08; if (on) { night(.8); } else { blackout(); glow(KID, 'blue'); } pose(KID, { pos: [17.6, 0, DAMZ + 7.2], ry: -.4, s: .78, e: on ? 'shock' : 'worried', aR: -1.4 }); torchAt(17.6, 1.2, DAMZ + 7.75, [.8, .3, -.6], on); SHAKE = t > 110.8 && t < 111.2 ? .06 : 0; cam([15.6, 2.4, DAMZ + 12.5], [17.6, 1.5, DAMZ + 7.2], 38, lt); SH.ov = () => { if (t > 110.8 && t < 111.3) T('TOC!', 760, 760, 80, '#fff', { w: 900, stroke: 12 }); }; });
+// 27 dad looked at the open sack, then at me: "relax, son. I take care of the dam."
+shot(112.56, (t, lt) => { night(.7); beam.intensity = 14; beam.position.set(17.0, 1.4, DAMZ + 9); beam.target.position.set(19.8, 2.6, DAMZ + 5.2); OPENSACK.visible = true; OPENSACK.position.set(18.6, 0, DAMZ + 6.6); OPENSACK.scale.setScalar(.6); pose(DAD, { pos: [19.8, 0, DAMZ + 5.2], ry: t < 114.2 ? -.7 : -.32, e: t > 117.5 && t < 119.6 ? talk(t) : (t > 114.3 ? 'smile' : 'neutral'), hx: t < 114.2 ? .35 : 0 });
+  SHAKE = 0; const k = eio(cl(lt / 7)); cam(L3([16.8, 3.0, DAMZ + 12.5], [18.3, 2.8, DAMZ + 9.6], k), [19.6, 2.3, DAMZ + 5.2], 38, lt);
+  SH.ov = () => { speech('Fica tranquilo, filho.\nEu cuido da represa.', 19.8, 3.4, DAMZ + 5.2, prog(t, 117.52, 117.8)); if (t > 119.4) { o2.fillStyle = `rgba(0,0,0,${prog(t, 119.4, 120.0)})`; o2.fillRect(0, 0, W, H); } }; });
+
+// ---------- captions ----------
+let WORDS = [];
+const KEY = new Set(['cor.','apaga','morrer.','amarelo','choque.','eletricista.','padaria.','rosa','queda.','térreo','elevador.','cinza','velhinho,','dormindo.','família','vale,','represa.','20','12','parafusos.','festa','junina','luz','acabou','azul.','afogamento.','represa.','plantão','sozinha,','também.','ninguém','dormiu','tranquilo,','prefeito','ginásio','forte','graxa.','preocupado.','lanterna,','filho.','última','comporta,','chave','sacos','pesados.','parafusos,','enormes,','comporta...','comporta.','última.','apagou.','escuro.','azul.','cinza.','bote','colete','só.','parafusos,','aguentar,','baixo','acendeu.','represa.','azul','cinza','represa']);
+let CH = [];
+function buildChunks() { let cur = []; const flush = () => { if (cur.length) CH.push(cur); cur = []; };
+  WORDS.forEach(w => { const txt = cur.map(x => x.w).join(' '); if (cur.length && (cur.length >= 3 || (txt + ' ' + w.w).length > 18 || w.s - cur[cur.length - 1].s > .9)) flush(); cur.push(w); if (/[.,!?:]$/.test(w.w)) flush(); }); flush();
+  CH.forEach((c, i) => { c.s = c[0].s; const nx = CH[i + 1]; c.e = Math.min(nx ? nx[0].s : 120.0, c[c.length - 1].s + 1.2); }); }
+function captions(t) {
+  if (t >= 120.0) return; const c = CH.find(c => t >= c.s - .02 && t < c.e); if (!c) return;
+  const k = c.s < .1 ? 1 : eback(prog(t, c.s - .02, c.s + .14)); const size = 80;
+  o2.font = `900 ${size}px Poppins`; const parts = c.map(w => ({ w: w.w.toUpperCase().replace(/[.,]$/, ''), key: KEY.has(w.w.toLowerCase()) }));
+  const sp = size * .28; const ws = parts.map(p => o2.measureText(p.w).width); const tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); const sc = Math.min(1, 960 / tot);
+  o2.save(); o2.translate(W / 2, 1400); o2.scale(k * sc, k * sc); let x = -tot / 2;
+  parts.forEach((p, i) => { const cx = x + ws[i] / 2; o2.save(); o2.shadowColor = 'rgba(0,0,0,.55)'; o2.shadowBlur = 18; o2.shadowOffsetY = 8; T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900, stroke: 16, sc: '#1b120c' }); o2.restore(); T(p.w, cx, 0, size, p.key ? '#FFC83D' : '#FFFFFF', { w: 900 }); x += ws[i] + sp; });
+  o2.restore();
+}
+// ---------- end card ----------
+function endCard(t) {
+  const lt = t - 120.0; o2.fillStyle = '#1a120b'; o2.fillRect(0, 0, W, H);
+  o2.save(); o2.translate(W / 2, 520); const k = eback(cl(lt / .5)); o2.scale(k, k);
+  for (const [dx, a] of [[-70, 1], [70, .55]]) { o2.globalAlpha = a; o2.fillStyle = '#2E6E8E'; o2.beginPath(); o2.arc(dx, 0, 120, 0, 7); o2.fill(); o2.strokeStyle = '#F2C14E'; o2.lineWidth = 10; o2.stroke(); o2.lineWidth = 5; o2.beginPath(); o2.ellipse(dx, 0, 50, 120, 0, 0, 7); o2.moveTo(dx - 120, 0); o2.lineTo(dx + 120, 0); o2.stroke(); }
+  o2.restore(); o2.globalAlpha = 1;
+  T('MUNDO PARALELO', W / 2, 760, 104 * eback(cl((lt - .15) / .4)), '#fff', { w: 900 });
+  o2.fillStyle = '#F2C14E'; const lw = 520 * eo(cl((lt - .35) / .4)); o2.fillRect(W / 2 - lw / 2, 832, lw, 8);
+  T('VOCÊ CONFIARIA NELE?', W / 2, 910, 46, '#F2C14E', { w: 800 });
+  const pk = (1 + .08 * Math.sin(t * 8)) * eback(cl((lt - .8) / .35)); o2.save(); o2.translate(W / 2, 1500); o2.scale(pk, pk); o2.fillStyle = '#C0392B'; rr(o2, -340, -70, 680, 140, 70); o2.fill(); o2.fillStyle = '#fff'; o2.beginPath(); o2.moveTo(-270, -32); o2.lineTo(-270, 32); o2.lineTo(-215, 0); o2.closePath(); o2.fill(); T('SIGA O CANAL', 35, 4, 54, '#fff', { w: 900 }); o2.restore();
+  o2.fillStyle = `rgba(0,0,0,${cl((t - 123.4) / .5)})`; o2.fillRect(0, 0, W, H);
+}
+// ---------- grain ----------
+const grainC = document.createElement('canvas'); grainC.width = 540; grainC.height = 960; const gx = grainC.getContext('2d'); const gid = gx.createImageData(540, 960);
+function grain(seed) { let s = (seed * 9301 + 49297) % 233280; for (let i = 0; i < gid.data.length; i += 4) { s = (s * 9301 + 49297) % 233280; const v = s / 233280 * 255; gid.data[i] = gid.data[i + 1] = gid.data[i + 2] = v; gid.data[i + 3] = 20; } gx.putImageData(gid, 0, 0); }
+
+
+
+
+window.renderFrame = (t) => {
+  if (t >= 120.0) { endCard(t); return out.toDataURL('image/jpeg', .9); }
+  hideAll(); resetGlow(); SH.ov = null; SHAKE = 0; ALL.forEach(c => { if (c.userData && c.userData.hats) hats(c, false); });
+  OPENSACK.scale.setScalar(1); TOOLBOX.rotation.set(0, 0, 0); HOU.userData.stream.visible = false; scene.fog = scene.fog || new THREE.Fog(0xbfe0ef, 80, 420);
+  BOLTS.forEach(o => { o.m.visible = !(t > 74 && o.g < 5); o.m.material.color.set(0xd8d8d8); o.m.scale.setScalar(1); });
+  DAD.userData.parts.arms.forEach(a => a.children[1].material.color.set(t > 72.3 ? 0x1b1b1b : 0xE8B48C));
+  const s = SH.filter(s => t >= s.t0).pop(); const lt = t - s.t0; s.fn(t, lt);
+  renderer.render(scene, camera);
+  o2.globalAlpha = 1; o2.filter = (lt < .14 && s.t0 > 0 ? `blur(${(1 - lt / .14) * 10}px) ` : '') + 'saturate(1.15) contrast(1.05) brightness(1.03)'; o2.drawImage(renderer.domElement, 0, 0); o2.filter = 'none';
+  if (SH.ov) { o2.save(); SH.ov(); o2.restore(); }
+  const v = o2.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .8); v.addColorStop(0, 'rgba(10,5,0,0)'); v.addColorStop(1, 'rgba(10,5,0,.32)'); o2.fillStyle = v; o2.fillRect(0, 0, W, H);
+  grain(Math.floor(t * 30)); o2.drawImage(grainC, 0, 0, W, H);
+  if (lt < .1 && s.t0 > 0) { o2.fillStyle = `rgba(255,255,255,${.25 * (1 - lt / .1)})`; o2.fillRect(0, 0, W, H); }
+  captions(t);
+  return out.toDataURL('image/jpeg', .9);
+};
+window.setWords = (w) => { WORDS = w; CH = []; buildChunks(); };
+await document.fonts.load('900 80px Poppins'); await document.fonts.load('800 40px Poppins'); await document.fonts.load('700 40px Poppins'); await document.fonts.load('600 40px Poppins');
+window.ready = true;
+</script></body></html>
