@@ -14,7 +14,7 @@ def noise(d):return R.normal(0,1,int(d*sr))
 def lp(x,k=30):return np.convolve(x,np.ones(k)/k,'same')
 S={
  'whoosh':lambda:lp(noise(.5),25)*np.sin(np.linspace(0,np.pi,int(.5*sr)))**2*3,
- 'swoosh_up':lambda:lp(noise(.7),12)*np.linspace(0,1,int(.7*sr))**2*np.r_[np.ones(int(.6*sr)),np.linspace(1,0,int(.1*sr))]*3,
+ 'swoosh_up':lambda:(lambda n:lp(noise(.7),12)[:n]*np.linspace(0,1,n)**2*np.minimum(1,np.linspace(7,0,n))*3)(int(.7*sr)),
  'pop':lambda:(lambda t:np.sin(2*np.pi*(500+1800*t)*t)*np.exp(-t*30))(tt(.15)),
  'ching':lambda:(lambda t:(np.sin(2*np.pi*2637*t)+.6*np.sin(2*np.pi*3520*t))*np.exp(-t*7))(tt(.6)),
  'thud':lambda:(lambda t:np.sin(2*np.pi*(85-45*t)*t)*np.exp(-t*12))(tt(.35))*1.5,
